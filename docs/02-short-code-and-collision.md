@@ -50,18 +50,6 @@
 
 ---
 
-### 自訂 Alias
-
-需要驗證哪些內容
-
-例如：
-
-- 長度限制
-- 保留字
-- 特殊字元
-
----
-
 ### Database Unique Index
 
 介紹 Unique Constraint

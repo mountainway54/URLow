@@ -45,10 +45,6 @@ Request
 
 ↓
 
-更新 Click Count
-
-↓
-
 302 Redirect
 ```
 

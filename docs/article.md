@@ -8,7 +8,7 @@
 
 我先前主要學習 JavaScript，這次會以 Nuxt 4、Vue 和輕量 TypeScript 開發。所謂輕量 TypeScript，是沿用熟悉的 JavaScript 寫法，只在函式參數、API 回應和資料模型等重要位置加入必要型別，暫時不使用複雜泛型或高階型別。希望透過規模明確的實際專案邊做邊學，逐步理解型別系統帶來的幫助。
 
-本系列除了記錄程式實作，也會說明需求拆解、架構選擇及技術取捨。目標不只是做出可以運作的功能，也希望建立一個結構清楚、容易測試、能夠部署並保留擴充空間的作品。
+本系列除了記錄程式實作，也會說明需求拆解、架構選擇及技術取捨。目標是完成一個結構清楚、容易測試且能夠部署的縮網址服務，不規劃額外擴充功能。
 
 ## 文章目錄
 
@@ -18,11 +18,11 @@
 
 ### 2. [短網址不是亂數而已｜Short Code 設計與碰撞率分析](./02-short-code-and-collision.md)
 
-比較 UUID、Base62、nanoid、Hash 與流水號等短碼方案，討論亂數安全性、碰撞處理、唯一索引及自訂 Alias 的驗證方式。
+比較 UUID、Base62、nanoid、Hash 與流水號等短碼方案，討論亂數安全性、碰撞處理與唯一索引。
 
 ### 3. [縮網址網站有哪些安全性問題？](./03-security.md)
 
-整理 Open Redirect、URL Validation、SSRF、SQL Injection 與 Rate Limit 等常見風險，說明縮網址服務需要採取的基本防護。
+整理 Open Redirect、URL Validation 與 SQL Injection 等常見風險，說明縮網址服務需要採取的基本防護。
 
 ### 4. [Nuxt Server API 如何完成縮網址 Redirect](./04-nuxt-redirect.md)
 
@@ -38,7 +38,7 @@
 
 - 可以建立及分享短網址
 - 可以透過短碼重新導向原始網址
-- 具備基本輸入驗證、錯誤處理與點擊統計
+- 具備基本輸入驗證與錯誤處理
 - 具有清楚的 Git commit 紀錄與 README
 - 保留 AI 協作所使用的 Prompt 與人工驗證方式
 - 視進度部署至雲端平台並錄製實作過程
