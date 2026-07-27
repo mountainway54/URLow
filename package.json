@@ -1,5 +1,5 @@
 {
-  "name": "url-shortener",
+  "name": "urlow",
   "type": "module",
   "private": true,
   "scripts": {
