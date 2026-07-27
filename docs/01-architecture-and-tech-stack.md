@@ -28,7 +28,7 @@
 
 ## 其他技術選型
 
-UI 預計使用 Tailwind CSS，以較少的自訂樣式快速完成響應式介面；資料庫採用 PostgreSQL，搭配 Drizzle ORM 管理 Schema 與型別安全的查詢；Zod 負責 API 輸入驗證；Vitest 則用於測試短碼、網址驗證及 API 的主要行為。
+實際完成後，UI 採用 Tailwind CSS 搭配原生 CSS：一次性的排版使用 Tailwind，共用的色彩、字級與動態效果則保留在 CSS。原先規劃的 PostgreSQL、Drizzle ORM、Zod 與 Vitest 沒有納入這一階段。
 
 ## 系統架構與資料流
 
