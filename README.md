@@ -43,15 +43,15 @@
 
 ## 技術架構
 
-| 類別 | 技術 | 用途 |
-| --- | --- | --- |
-| Full-stack Framework | Nuxt 4 | 頁面、Server API 與動態路由 |
-| UI | Vue 3、Tailwind CSS | 互動元件與響應式介面 |
-| Language | 輕量 TypeScript | 為重要資料加入型別，避免不必要的複雜度 |
-| Database | PostgreSQL | 保存原始網址與短碼 |
-| ORM | Drizzle ORM | Schema 與型別安全的資料庫查詢 |
-| Validation | Zod | API 輸入與環境變數驗證 |
-| Testing | Vitest | 短碼、網址驗證及 API 測試 |
+| 類別                 | 技術                | 用途                                   |
+| -------------------- | ------------------- | -------------------------------------- |
+| Full-stack Framework | Nuxt 4              | 頁面、Server API 與動態路由            |
+| UI                   | Vue 3、Tailwind CSS | 互動元件與響應式介面                   |
+| Language             | 輕量 TypeScript     | 為重要資料加入型別，避免不必要的複雜度 |
+| Database             | PostgreSQL          | 保存原始網址與短碼                     |
+| ORM                  | Drizzle ORM         | Schema 與型別安全的資料庫查詢          |
+| Validation           | Zod                 | API 輸入與環境變數驗證                 |
+| Testing              | Vitest              | 短碼、網址驗證及 API 測試              |
 
 目前儲存庫已安裝 Nuxt、Vue 與 Vue Router；其餘項目屬於預定導入的技術，會隨對應功能一併加入。
 
@@ -96,12 +96,12 @@ npm run dev
 
 ### 可用指令
 
-| 指令 | 說明 |
-| --- | --- |
-| `npm run dev` | 啟動本機開發伺服器 |
-| `npm run build` | 建立正式環境版本 |
-| `npm run preview` | 預覽正式環境版本 |
-| `npm run generate` | 產生靜態輸出 |
+| 指令               | 說明               |
+| ------------------ | ------------------ |
+| `npm run dev`      | 啟動本機開發伺服器 |
+| `npm run build`    | 建立正式環境版本   |
+| `npm run preview`  | 預覽正式環境版本   |
+| `npm run generate` | 產生靜態輸出       |
 
 > 資料庫連線與環境變數範例會在資料庫功能加入時同步補上，避免文件提供尚未生效的設定。
 
