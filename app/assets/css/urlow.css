@@ -247,7 +247,6 @@ textarea:focus {
 }
 
 button:focus-visible,
-input:focus-visible,
 textarea:focus-visible {
   outline: 3px solid rgba(22, 137, 255, 0.26);
   outline-offset: 3px;
