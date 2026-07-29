@@ -159,10 +159,6 @@ textarea::placeholder {
   font-family: inherit;
 }
 
-.url-prefix {
-  color: var(--muted-slate);
-}
-
 .icon-button {
   display: grid;
   flex: 0 0 48px;
@@ -210,6 +206,20 @@ textarea:focus {
     inset 0 1px 0 rgba(255, 255, 255, 0.34);
   cursor: pointer;
   font-weight: 680;
+}
+
+.lookup-submit {
+  height: 52px;
+  min-height: 52px;
+  box-shadow: none;
+}
+
+.create-submit {
+  box-shadow: none;
+}
+
+.lookup-form .field {
+  margin-bottom: 0;
 }
 
 .form-message {

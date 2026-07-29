@@ -96,24 +96,23 @@ onBeforeUnmount(() => {
     role="tabpanel"
     aria-labelledby="edit-tab"
   >
-    <form class="grid grid-cols-[minmax(0,1fr)_minmax(0,.82fr)_auto] items-end gap-3 max-[700px]:grid-cols-1" @submit.prevent="lookupShortLink">
-      <div class="field mb-0">
+    <form class="lookup-form grid grid-cols-[minmax(0,1fr)_minmax(0,.82fr)_auto] items-end gap-3 max-[700px]:grid-cols-1" @submit.prevent="lookupShortLink">
+      <div class="field">
         <label for="lookup-short-url">短網址</label>
         <div class="input-shell input-shell--mono">
-          <span class="url-prefix" aria-hidden="true">urlow.io/</span>
           <input
             id="lookup-short-url"
             v-model="lookupShortUrl"
             type="text"
             autocomplete="off"
             spellcheck="false"
-            placeholder="nuxt-guide"
+            placeholder="https://urlow.io/nuxt-guide"
             @input="resetLookup"
           >
         </div>
       </div>
 
-      <div class="field mb-0">
+      <div class="field">
         <label for="lookup-password">密碼</label>
         <div class="input-shell">
           <input
@@ -139,7 +138,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <button class="primary-button w-auto min-w-[126px] px-[17px] max-[700px]:w-full" type="submit">
+      <button class="primary-button lookup-submit w-auto min-w-[126px] px-[17px] max-[700px]:w-full" type="submit">
         查看短網址
       </button>
     </form>

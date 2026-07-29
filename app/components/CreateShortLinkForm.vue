@@ -157,7 +157,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="grid grid-cols-[auto_minmax(0,1fr)] items-stretch gap-3 max-[700px]:grid-cols-1">
-      <button class="primary-button w-[184px] px-[18px] max-[700px]:w-full" type="submit">
+      <button class="primary-button create-submit w-[184px] px-[18px] max-[700px]:w-full" type="submit">
         產生短網址
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
           <path d="M5 12h14" />

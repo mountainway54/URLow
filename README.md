@@ -114,6 +114,7 @@ npm run dev
 3. [縮網址網站的安全性問題](./docs/03-security.md)
 4. [Nuxt Server API 與 Redirect](./docs/04-nuxt-redirect.md)
 5. [AI 如何協助完成專案](./docs/05-ai-collaboration.md)
+6. [Debug 紀錄](./docs/06-debug-log.md)
 
 ## AI 協作說明
 
@@ -132,7 +133,7 @@ npm run dev
 - [ ] 實作短碼 Redirect
 - [ ] 加入輸入驗證與錯誤處理
 - [ ] 補充自動化測試
-- [ ] 部署至雲端平台
+- [x] 部署至雲端平台
 - [ ] 錄製並上傳實作過程
 
 ## 設計原則
