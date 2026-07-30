@@ -2,6 +2,9 @@
   "name": "urlow",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "build": "nuxt build",
     "cf:dev": "npm run build && node scripts/cf-dev.mjs",
