@@ -1,0 +1,3 @@
+# Wrangler local Hyperdrive override only. Copy this file to .dev.vars.
+# Never commit the actual value.
+CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=postgresql://USER:PASSWORD@DIRECT_HOST/DATABASE?sslmode=require
