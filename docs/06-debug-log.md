@@ -128,3 +128,95 @@ curl.exe -i http://127.0.0.1:8787/api/health/database
 ```
 
 成功時預期 `200 {"status":"ok"}`；資料庫不可達時預期 `503 {"status":"error","code":"DATABASE_UNAVAILABLE"}`。
+
+## Cloudflare Worker：首頁被短碼動態路由攔截
+
+### 症狀
+
+以 `npm run cf:dev` 啟動 Wrangler 後，短網址 API 與資料庫 health endpoint 都能正常使用，但瀏覽首頁時出現：
+
+```text
+GET http://127.0.0.1:8787/ net::ERR_HTTP_RESPONSE_CODE_FAILURE 404 (Not Found)
+```
+
+當時各路徑的回應如下：
+
+- `/` 回傳空內容的 `404`。
+- `/api/health/database` 正常回傳 `200`。
+- 已存在的短網址仍能回傳 `302 Redirect`。
+- `/_nuxt/*` 靜態資源能正常載入。
+
+這表示 Worker、Hyperdrive 與 API 並未整體故障，問題只發生在首頁的路由分派。
+
+### 排查
+
+一開始發現 `.output/public` 沒有 `index.html`，因此懷疑 Wrangler Static Assets 在找不到首頁資產後，沒有把請求交給 Nuxt renderer。曾先在 `wrangler.jsonc` 啟用 `assets.run_worker_first`，但實測首頁仍回傳 `404`，證明這不是唯一原因。
+
+進一步比較路徑後發現：
+
+- `/x/y` 能由 Nuxt renderer 回傳 HTML。
+- `/` 與單段路徑則回傳空的 `404`。
+- Nitro 建置產物同時註冊了 `/:code` 與 `/**` renderer。
+
+原本的 `server/routes/[code].get.ts` 在 Nitro 路由比對時也會攔截根路徑 `/`，此時取得的 `code` 是空字串。handler 將空字串視為非法短碼並主動設定 `404`，因此後面的 Nuxt renderer 沒有機會處理首頁。
+
+只在 handler 遇到空字串時直接 `return` 仍無法解決，因為 Nitro 已將該動態 route 視為本次請求的處理者，不會繼續交給 renderer。
+
+### 解法
+
+將短碼重新導向從動態 server route 改為獨立 middleware：
+
+```text
+server/routes/[code].get.ts
+→ server/middleware/short-url-redirect.ts
+```
+
+middleware 僅處理符合以下條件的請求：
+
+- HTTP method 是 `GET` 或 `HEAD`。
+- pathname 是單段路徑，例如 `/As2fBrdp`。
+
+根路徑 `/`、API 路徑及其他多段路徑會直接略過 middleware，繼續交由 Nuxt/Nitro 的後續 handler 處理。無效的單段短碼仍回傳 `404`，有效短碼則維持原本的 KV、資料庫查詢與 `302 Redirect` 流程。
+
+Wrangler 的資產設定則讓動態路徑優先進入 Worker，同時排除可直接提供的靜態檔案：
+
+```jsonc
+"assets": {
+  "binding": "ASSETS",
+  "directory": ".output/public",
+  "run_worker_first": [
+    "/*",
+    "!/_nuxt/*",
+    "!/favicon.ico",
+    "!/robots.txt"
+  ]
+}
+```
+
+### 驗證
+
+修正後以本機 Wrangler 實際驗證：
+
+```text
+GET /                         → 200 text/html
+GET /api/health/database      → 200 application/json
+GET /As2fBrdp                 → 302
+GET /abc                      → 404
+GET /favicon.ico              → 200
+```
+
+並新增回歸測試，確認：
+
+- 根路徑會略過短碼 middleware。
+- 非 `GET`／`HEAD` 請求不會被誤認成短碼。
+- 原有的正向快取、負向快取與資料庫回填行為維持不變。
+
+最終執行結果：
+
+```text
+Test Files  13 passed | 2 skipped
+Tests       81 passed | 8 skipped
+npm run build → success
+```
+
+本機重複啟動 Wrangler 進行驗證時，曾因殘留的 `workerd`／Node 程序鎖住 `.output/public` 而出現 `EBUSY`。確認並停止屬於本專案的舊 `cf:dev` 程序樹後即可重新建置；不需要刪除資料庫或重建專案。

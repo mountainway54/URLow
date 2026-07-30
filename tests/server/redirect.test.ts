@@ -4,6 +4,7 @@ import { encodeMissingValue, encodeRedirectValue } from '../../server/services/s
 
 const mocks = vi.hoisted(() => ({
   code: 'nuxt-guide',
+  method: 'GET',
   setResponseStatus: vi.fn(),
   sendRedirect: vi.fn((_event, targetUrl, status) => ({ targetUrl, status })),
   findTargetByCode: vi.fn(),
@@ -14,7 +15,8 @@ vi.mock('h3', async (importOriginal) => {
   return {
     ...original,
     defineEventHandler: (handler: unknown) => handler,
-    getRouterParam: () => mocks.code,
+    getMethod: () => mocks.method,
+    getRequestURL: () => new URL(`http://localhost/${mocks.code}`),
     setResponseStatus: mocks.setResponseStatus,
     sendRedirect: mocks.sendRedirect,
   }
@@ -26,7 +28,7 @@ vi.mock('../../server/services/short-url-repository', () => ({
   },
 }))
 
-import handler from '../../server/routes/[code].get'
+import handler from '../../server/middleware/short-url-redirect'
 
 function eventWithCache(rawValue: string | null) {
   const pending: Promise<unknown>[] = []
@@ -51,10 +53,33 @@ function eventWithCache(rawValue: string | null) {
   return { event, cache, pending }
 }
 
-describe('GET /:code redirect endpoint', () => {
+describe('GET /:code redirect middleware', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.code = 'nuxt-guide'
+    mocks.method = 'GET'
     mocks.findTargetByCode.mockResolvedValue(null)
+  })
+
+  it('ignores non-GET requests', async () => {
+    mocks.method = 'POST'
+    const { event, cache } = eventWithCache(null)
+
+    await expect(handler(event)).resolves.toBeUndefined()
+
+    expect(cache.get).not.toHaveBeenCalled()
+    expect(mocks.findTargetByCode).not.toHaveBeenCalled()
+  })
+
+  it('lets the Nuxt renderer handle the root path', async () => {
+    mocks.code = ''
+    const { event, cache } = eventWithCache(null)
+
+    await expect(handler(event)).resolves.toBeUndefined()
+
+    expect(mocks.setResponseStatus).not.toHaveBeenCalled()
+    expect(cache.get).not.toHaveBeenCalled()
+    expect(mocks.findTargetByCode).not.toHaveBeenCalled()
   })
 
   it('returns a positive cache hit without database access or writes', async () => {
