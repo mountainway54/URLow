@@ -1,17 +1,5 @@
 # 系列五：AI 如何協助我完成這個專案
 
-## 文章目標
-
-這篇文章記錄我如何把 AI 當成協作工具，而不是把它產生的內容直接複製進專案。
-
-AI 可以快速整理選項、搜尋專案與草擬規格，但它的第一個答案不一定完整。真正有價值的合作，是持續追問依據、指出被忽略的限制，再用官方文件與可驗證的規格收斂設計。
-
-URLow 的後端架構討論就是一個具體例子：一開始只是詢問該安裝哪些 npm 套件，最後一路釐清 Cloudflare Workers、Neon PostgreSQL、Hyperdrive、Cloudflare KV、Redirect 熱路徑、快取一致性及費用限制。
-
----
-
-## 從開發工具開始：用 `grill-me` 逼出隱藏決策
-
 這次協作先安裝了 `grill-me` 與它依賴的 `grilling` skill。它不負責直接產生程式碼，而是要求 AI 一次只問一個問題，並優先從專案中查找能自行確認的事實。
 
 我一開始的問題是：
@@ -134,14 +122,14 @@ PostgreSQL 仍是 source of truth；Hyperdrive 被保留在 cache miss、health 
 ```ts
 type RedirectCacheValue =
   | {
-      version: 1
-      kind: 'redirect'
-      targetUrl: string
+      version: 1;
+      kind: "redirect";
+      targetUrl: string;
     }
   | {
-      version: 1
-      kind: 'missing'
-    }
+      version: 1;
+      kind: "missing";
+    };
 ```
 
 規則如下：
@@ -221,15 +209,15 @@ type RedirectCacheValue =
 
 最後行為被明確定義為：
 
-| KV 狀態 | PostgreSQL 狀態 | 結果 |
-| --- | --- | --- |
-| 正向命中 | 不檢查 | 302 |
-| 負向命中 | 不檢查 | 404 |
-| Miss | 找到 | 302，並回填正向 KV |
-| Miss | 查無 | 404，並寫入 60 秒負向 KV |
-| Miss／無效 value | 不可用 | 503 |
-| KV 讀取失敗 | 可用 | 依 PostgreSQL 結果回應 |
-| KV 與 PostgreSQL 皆失敗 | 不可用 | 503 |
+| KV 狀態                 | PostgreSQL 狀態 | 結果                     |
+| ----------------------- | --------------- | ------------------------ |
+| 正向命中                | 不檢查          | 302                      |
+| 負向命中                | 不檢查          | 404                      |
+| Miss                    | 找到            | 302，並回填正向 KV       |
+| Miss                    | 查無            | 404，並寫入 60 秒負向 KV |
+| Miss／無效 value        | 不可用          | 503                      |
+| KV 讀取失敗             | 可用            | 依 PostgreSQL 結果回應   |
+| KV 與 PostgreSQL 皆失敗 | 不可用          | 503                      |
 
 系統不另外保存 stale backup。有效 KV hit 即使在 PostgreSQL outage 期間仍可服務，但 cache miss 不會猜測目標網址。
 
@@ -255,23 +243,6 @@ Cloudflare Workers Free plan 已包含有限的 Workers KV 額度：
 參考資料：
 
 - [Cloudflare Workers KV Pricing](https://developers.cloudflare.com/kv/platform/pricing/)
-
----
-
-## 這個專案需要 Axios 嗎？
-
-討論中我也問：
-
-> 「這個專案用到AXIOS嗎」
-
-檢查 `package.json`、lockfile 與原始碼後，專案目前沒有使用 Axios，也沒有必要為了呼叫自己的 Nuxt API 額外安裝。
-
-Nuxt 已提供：
-
-- `$fetch`：元件、composable 或 server-side HTTP request。
-- `useFetch`：頁面載入與 SSR 資料取得。
-
-除非未來需要既有 Axios interceptor 生態或特殊 adapter，否則使用 Nuxt 內建工具可以減少重複依賴。
 
 ---
 
@@ -341,6 +312,106 @@ Spectra analyzer 的 Coverage、Consistency 與 Gaps 均為 Clean，validation �
 - `spectra validate add-cloudflare-neon-hyperdrive`。
 
 最後也討論了 GitHub CI 的下一步方向：PR 僅執行無 production secrets 的 test/build/dry-run，production deployment 則使用受保護的 GitHub Environment，依序執行 migration、deploy 與 health check。這部分本次只保留為後續建議，尚未建立 workflow。
+
+---
+
+## 建立短網址 API：從一句需求到 TDD、Postman 驗證與架構檢討
+
+完成 Neon、Hyperdrive、KV 與 Redirect 基礎後，我用一句很直接的需求開啟下一個 session：
+
+> 「我想建立後端API 要用ZOD也要使用TDD 要記得分開middleware檔案」
+
+這次的重點不是讓 AI 自由決定一整套 API，而是由我逐步鎖定範圍。我選擇先完成 `POST /api/short-urls`，短碼由系統自動產生，暫時不串接前端，也不加入自訂短碼、修改或刪除 API。
+
+我要求 Zod schema、request validation 與 handler 分開，但不把驗證做成 Nuxt 全域 middleware。最後採用 route-scoped wrapper：由 `POST /api/short-urls` 明確套用共用 validation helper，避免 Redirect 與 health endpoint 也被迫解析 request body。
+
+這個要求最後形成清楚的責任分工：
+
+| 檔案角色             | 責任                                                     |
+| -------------------- | -------------------------------------------------------- |
+| API handler          | 組裝依賴、呼叫建立流程、設定 HTTP status 與成功 response |
+| Zod schema           | 定義並正規化 `{ originalUrl }`                           |
+| Validation helper    | 讀取 JSON body、執行 `safeParse`、產生穩定的 400 error   |
+| Short-code service   | 使用 Web Crypto 產生 8 字元 Base62 短碼                  |
+| Creation service     | 協調短碼產生、碰撞重試與建立流程                         |
+| Repository           | 封裝 PostgreSQL insert、lookup 與 unique constraint 判斷 |
+| Mutation coordinator | 維持 PostgreSQL 與 KV 的寫入順序                         |
+| Response mapper      | 將內部例外轉成不洩漏敏感資訊的 500／503 response         |
+
+實作完成後，我也主動依檔名與資料夾結構逐一描述這些檔案的用途，再請 AI 對照實際程式確認。這個步驟讓我發現兩個容易誤會的地方：短碼 service 只負責產生候選值，不查資料庫；response mapper 目前只處理錯誤，成功 response 仍由 handler 組裝。
+
+### 用 Spectra 與 TDD 推進實作
+
+需求收斂後，我依序下達：
+
+```text
+$spectra-propose
+$spectra-apply
+```
+
+Spectra change `add-short-url-api` 將需求整理成 proposal、design、specs 與 tasks。實作採 Red → Green → Refactor：
+
+1. 先建立 Zod middleware、Base62 generator、collision retry 與 API contract 的失敗測試。
+2. 確認測試因 production module 尚不存在而失敗。
+3. 加入最小實作讓目標測試通過。
+4. 集中整理 public error mapping，再執行完整 Vitest 與 Nuxt Cloudflare build。
+
+這次完成的行為包括：
+
+- `POST /api/short-urls` 只接受 strict `{ originalUrl }`。
+- URL 會 trim，長度上限為 2048，只允許絕對 HTTP(S) URL。
+- 使用 Web Crypto 與 rejection sampling 產生 8 字元 Base62 code。
+- 由 PostgreSQL unique constraint 判斷碰撞，最多嘗試五次。
+- PostgreSQL 建立成功後主動同步 KV。
+- 回應使用固定的 201、400、500 與 503 contract，且不公開 SQL、連線資訊或 stack trace。
+
+### 我要求用 Postman 驗證真正的 HTTP 行為
+
+自動化測試與 build 通過後，我沒有只停在 test result，而是追問：
+
+> 「我要如何在本地測試 by postman」
+
+我先透過本機 Cloudflare Worker 送出建立請求，取得短碼與本機 `shortUrl`，再用 Postman 對短碼發送 GET。因為 Postman 預設會自動跟隨 Redirect，我關閉 request-level 的 `Automatically follow redirects`，最後直接看到：
+
+```text
+302 Found
+Location: https://example.com/article
+```
+
+回應 body 同時包含 Nitro/H3 產生的 HTML meta refresh。這次手動驗證補上了自動化 handler test 沒有呈現的完整使用流程：
+
+```text
+POST 建立短網址
+        ↓
+PostgreSQL／KV
+        ↓
+GET /<code>
+        ↓
+302 Redirect
+```
+
+### 面對 review comment，我先要求評估而不是直接修改
+
+後續 review 指出 mutation 先刪除 KV、再修改資料庫時，並行 Redirect 可能讀到舊資料並排程 backfill。我請codex評估一下：
+
+分析時發現，DB-first 的確能縮小由主動刪除造成的 race window，卻不能完全阻止已在途的舊 backfill 最後覆蓋新值。若要真正消除這個問題，需要停止 Redirect-side backfill，或引入版本與強一致性仲裁；單純交換兩行順序不足以提供完整保證。
+
+理解代價後，我決定：
+
+### 本次 session 的結果分類
+
+| 狀態           | 內容                                                                                                                                                |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 已完成         | Zod strict validation、route-scoped middleware、短碼產生、碰撞重試、建立 API、錯誤遮蔽、自動化測試、Nuxt build、Postman 201／302 驗證、Spectra 封存 |
+| 已評估但未修改 | mutation 與 Redirect backfill 之間的 KV race condition                                                                                              |
+
+最後我執行：
+
+```text
+$spectra-archive add-short-url-api
+```
+
+這次協作讓我再次確認：AI 最有價值的地方不是替我快速接受 review 建議，而是把建議放回完整時序中檢查。看似合理的「先改 DB 再刪快取」仍可能漏掉在途 backfill；先要求評估，再決定是否承擔複雜度，比直接修改更符合這個 MVP 的範圍。
 
 ---
 
