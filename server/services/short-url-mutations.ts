@@ -6,8 +6,11 @@ import {
 
 export const KV_STALE_WINDOW_WARNING = 'Other regions may observe an older redirect for approximately 60 seconds or longer.'
 
-export interface ShortUrlMutationStore {
+export interface ShortUrlCreationStore {
   insert(code: string, targetUrl: string): Promise<void>
+}
+
+export interface ShortUrlMutationStore extends ShortUrlCreationStore {
   updateTarget(code: string, targetUrl: string): Promise<void>
   disable(code: string): Promise<void>
   delete(code: string): Promise<void>
@@ -18,22 +21,41 @@ export interface MutationResult {
   staleWindowWarning: typeof KV_STALE_WINDOW_WARNING
 }
 
-export class ShortUrlMutationCoordinator {
+export class ShortUrlCreationCoordinator {
   constructor(
-    private readonly cache: RedirectCache,
-    private readonly store: ShortUrlMutationStore,
+    protected readonly cache: RedirectCache,
+    private readonly creationStore: ShortUrlCreationStore,
   ) {}
 
   async create(code: string, targetUrl: string): Promise<MutationResult> {
-    await this.store.insert(code, targetUrl)
+    await this.creationStore.insert(code, targetUrl)
 
     try {
       await this.cache.put(redirectCacheKey(code), encodeRedirectValue(targetUrl))
       return this.result(true)
     }
-    catch {
+    catch (error) {
+      console.error('Short URL cache synchronization failed', {
+        errorType: error instanceof Error ? error.name : 'UnknownError',
+      })
       return this.result(false)
     }
+  }
+
+  protected result(cacheSynchronized: boolean): MutationResult {
+    return {
+      cacheSynchronized,
+      staleWindowWarning: KV_STALE_WINDOW_WARNING,
+    }
+  }
+}
+
+export class ShortUrlMutationCoordinator extends ShortUrlCreationCoordinator {
+  constructor(
+    cache: RedirectCache,
+    private readonly store: ShortUrlMutationStore,
+  ) {
+    super(cache, store)
   }
 
   async updateTarget(code: string, targetUrl: string): Promise<MutationResult> {
@@ -59,12 +81,5 @@ export class ShortUrlMutationCoordinator {
     await this.cache.delete(redirectCacheKey(code))
     await this.store.delete(code)
     return this.result(true)
-  }
-
-  private result(cacheSynchronized: boolean): MutationResult {
-    return {
-      cacheSynchronized,
-      staleWindowWarning: KV_STALE_WINDOW_WARNING,
-    }
   }
 }

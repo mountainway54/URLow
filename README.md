@@ -4,7 +4,7 @@
 
 ### 把冗長網址，變成簡潔好分享的連結
 
-一個以 Nuxt 打造的現代化縮網址服務。目前具備可操作的前端介面、Cloudflare Worker 動態 runtime、Neon PostgreSQL 基礎 schema，以及 KV read-through Redirect；對外建立／編輯／刪除 API 仍在開發中。
+一個以 Nuxt 打造的現代化縮網址服務。目前具備可操作的前端介面、Cloudflare Worker 動態 runtime、Neon PostgreSQL、建立短網址 API，以及 KV read-through Redirect；對外編輯／刪除 API 仍在開發中。
 
 ![Nuxt](https://img.shields.io/badge/Nuxt-4.5-00DC82?logo=nuxtdotjs&logoColor=white)
 ![Vue](https://img.shields.io/badge/Vue-3.5-42B883?logo=vuedotjs&logoColor=white)
@@ -14,7 +14,7 @@
 </div>
 
 > [!NOTE]
-> URLow 目前處於開發階段。響應式介面仍使用本機假資料；`GET /:code` Redirect 與資料庫健康檢查已實作，但尚未提供對外 mutation API 或前端後端串接。
+> URLow 目前處於開發階段。響應式介面仍使用本機假資料；建立 API、`GET /:code` Redirect 與資料庫健康檢查已實作，但前端尚未串接 API。
 
 ## 目前功能
 
@@ -72,13 +72,51 @@ Browser → Cloudflare ES Module Worker → SHORT_URL_CACHE (KV)
 目前提供：
 
 ```http
+POST /api/short-urls
 GET /:code
 GET /api/health/database
 ```
 
+- `POST /api/short-urls`：建立短網址；以 Zod 驗證 request body、產生 8 字元 Base62 短碼，並同步 PostgreSQL 與 KV。
 - `GET /:code`：KV hit 直接回應，miss 才查 PostgreSQL；回傳 `302`、`404` 或 `503`。
 - `GET /api/health/database`：資料庫可用時回傳 `200 {"status":"ok"}`，否則回傳穩定的 sanitized `503 {"status":"error","code":"DATABASE_UNAVAILABLE"}`。
-- 對外 `POST`／`PATCH`／`DELETE` API 不在目前範圍。
+- 對外 `PATCH`／`DELETE` API 不在目前範圍。
+
+### 建立短網址 API
+
+Request body 只能包含 `originalUrl`。網址會先去除前後空白，長度不得超過 2048 字元，且僅接受絕對 `http://` 或 `https://` URL：
+
+```http
+POST /api/short-urls
+Content-Type: application/json
+
+{
+  "originalUrl": "https://example.com/article"
+}
+```
+
+建立成功回傳 HTTP 201；`shortUrl` 使用目前 request origin：
+
+```json
+{
+  "data": {
+    "code": "aB3xY8qP",
+    "originalUrl": "https://example.com/article",
+    "shortUrl": "https://urlow.example/aB3xY8qP"
+  }
+}
+```
+
+錯誤使用穩定且不包含資料庫或 stack trace 的格式：
+
+| HTTP | `error.code` | 說明 |
+| ---- | ------------ | ---- |
+| 400 | `VALIDATION_ERROR` | JSON body 或網址不符合 Zod schema |
+| 503 | `SHORT_CODE_GENERATION_FAILED` | 五次候選短碼都發生唯一限制碰撞 |
+| 503 | `DATABASE_UNAVAILABLE` | PostgreSQL 無法完成建立 |
+| 500 | `INTERNAL_ERROR` | 非預期伺服器錯誤 |
+
+PostgreSQL 是 source of truth。資料列建立後若 KV 同步失敗，API 仍回 201；後續 Redirect 可在 cache miss 時從 PostgreSQL 解析並回填 KV。這個階段不包含前端串接、認證、Rate Limiting、自訂短碼或其他 mutation API。
 
 ## 開始使用
 
@@ -169,7 +207,7 @@ npm.cmd run deploy
 - [x] 實作產品首頁與響應式介面
 - [x] 完成雙流程本機假資料互動
 - [x] 加入 PostgreSQL、Hyperdrive 與 Drizzle ORM
-- [ ] 實作建立短網址 API
+- [x] 實作建立短網址 API
 - [x] 實作短碼 Redirect
 - [x] 加入 Redirect 與 runtime 設定驗證
 - [x] 補充資料庫、快取與 Redirect 自動化測試
