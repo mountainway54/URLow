@@ -20,6 +20,73 @@ describeWithDatabase('short_urls migration', () => {
     await client?.end()
   })
 
+  it('applies defaults when optional management metadata is omitted', async () => {
+    await client.query('BEGIN')
+
+    try {
+      const result = await client.query<{
+        management_password_hash: string | null
+        note: string | null
+        enabled: boolean
+        updated_at: Date
+      }>(
+        `INSERT INTO short_urls (original_url, code)
+         VALUES ($1, $2)
+         RETURNING management_password_hash, note, enabled, updated_at`,
+        ['https://example.com/defaults', 'metadata-defaults'],
+      )
+
+      expect(result.rows[0]).toMatchObject({
+        management_password_hash: null,
+        note: null,
+        enabled: true,
+      })
+      expect(result.rows[0]?.updated_at).toBeInstanceOf(Date)
+    }
+    finally {
+      await client.query('ROLLBACK')
+    }
+  })
+
+  it.each([
+    {
+      name: 'management password hashes longer than 255 characters',
+      column: 'management_password_hash',
+      value: 'h'.repeat(256),
+      errorCode: '22001',
+    },
+    {
+      name: 'notes longer than 240 characters',
+      column: 'note',
+      value: 'n'.repeat(241),
+      errorCode: '22001',
+    },
+    {
+      name: 'a null enabled state',
+      column: 'enabled',
+      value: null,
+      errorCode: '23502',
+    },
+    {
+      name: 'a null updated timestamp',
+      column: 'updated_at',
+      value: null,
+      errorCode: '23502',
+    },
+  ])('rejects $name', async ({ column, value, errorCode }) => {
+    await client.query('BEGIN')
+
+    try {
+      await expect(client.query(
+        `INSERT INTO short_urls (original_url, code, "${column}") VALUES ($1, $2, $3)`,
+        ['https://example.com/invalid-metadata', `invalid-${column.slice(0, 20)}`, value],
+      )).rejects.toMatchObject({ code: errorCode })
+    }
+    finally {
+      await client.query('ROLLBACK')
+    }
+  })
+
   it('rejects duplicate nuxt-guide codes', async () => {
     await client.query('BEGIN')
 
