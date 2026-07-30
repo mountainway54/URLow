@@ -105,7 +105,7 @@ describe('route-scoped short URL request validation', () => {
   it('is not registered as global middleware or imported by existing GET routes', async () => {
     const [healthSource, redirectSource] = await Promise.all([
       readFile('server/api/health/database.get.ts', 'utf8'),
-      readFile('server/routes/[code].get.ts', 'utf8'),
+      readFile('server/middleware/short-url-redirect.ts', 'utf8'),
     ])
 
     expect(healthSource).not.toContain('validate-request-body')

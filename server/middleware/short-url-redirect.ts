@@ -1,10 +1,32 @@
-import { defineEventHandler, getRouterParam, sendRedirect, setResponseStatus } from 'h3'
+import {
+  defineEventHandler,
+  getMethod,
+  getRequestURL,
+  sendRedirect,
+  setResponseStatus,
+} from 'h3'
 import { resolveRedirect } from '../services/short-url-cache'
 import { ShortUrlRepository } from '../services/short-url-repository'
 import { parseWorkerEnv } from '../utils/env'
 
 export default defineEventHandler(async (event) => {
-  const code = getRouterParam(event, 'code') ?? ''
+  if (!['GET', 'HEAD'].includes(getMethod(event))) {
+    return
+  }
+
+  const pathMatch = /^\/([^/]+)\/?$/u.exec(getRequestURL(event).pathname)
+  if (!pathMatch) {
+    return
+  }
+
+  let code: string
+  try {
+    code = decodeURIComponent(pathMatch[1] ?? '')
+  }
+  catch {
+    setResponseStatus(event, 404)
+    return
+  }
 
   if (!/^[A-Za-z0-9_-]{4,32}$/u.test(code)) {
     setResponseStatus(event, 404)

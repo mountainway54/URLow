@@ -9,7 +9,13 @@
   },
   "assets": {
     "binding": "ASSETS",
-    "directory": ".output/public"
+    "directory": ".output/public",
+    "run_worker_first": [
+      "/*",
+      "!/_nuxt/*",
+      "!/favicon.ico",
+      "!/robots.txt"
+    ]
   },
   "hyperdrive": [
     {
