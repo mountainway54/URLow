@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   KV_STALE_WINDOW_WARNING,
+  ShortUrlCreationCoordinator,
   ShortUrlMutationCoordinator,
 } from '../../server/services/short-url-mutations'
 import { encodeRedirectValue } from '../../server/services/short-url-cache'
@@ -22,6 +23,24 @@ function setup() {
 }
 
 describe('active cache synchronization for mutations', () => {
+  it('supports creation with an insert-only store', async () => {
+    const cache = {
+      get: vi.fn(),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn(),
+    }
+    const store = {
+      insert: vi.fn().mockResolvedValue(undefined),
+    }
+    const coordinator = new ShortUrlCreationCoordinator(cache, store)
+
+    await expect(coordinator.create('new-code', 'https://example.com/new')).resolves.toEqual({
+      cacheSynchronized: true,
+      staleWindowWarning: KV_STALE_WINDOW_WARNING,
+    })
+    expect(store.insert).toHaveBeenCalledWith('new-code', 'https://example.com/new')
+  })
+
   it('inserts before overwriting a negative marker', async () => {
     const { order, cache, coordinator } = setup()
     await expect(coordinator.create('new-code', 'https://example.com/new')).resolves.toEqual({
