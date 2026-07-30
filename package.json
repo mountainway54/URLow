@@ -4,16 +4,31 @@
   "private": true,
   "scripts": {
     "build": "nuxt build",
+    "cf:dev": "npm run build && node scripts/cf-dev.mjs",
+    "cf:typegen": "wrangler types",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
     "dev": "nuxt dev",
+    "deploy": "npm run build && wrangler deploy",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "test": "vitest --passWithNoTests"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "drizzle-orm": "^0.45.2",
     "nuxt": "^4.5.0",
+    "pg": "^8.22.0",
     "tailwindcss": "^4.3.3",
     "vue": "^3.5.40",
-    "vue-router": "^5.2.0"
+    "vue-router": "^5.2.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.20.0",
+    "drizzle-kit": "^0.31.10",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.115.0"
   }
 }

@@ -28,22 +28,21 @@
 
 ## 其他技術選型
 
-實際完成後，UI 採用 Tailwind CSS 搭配原生 CSS：一次性的排版使用 Tailwind，共用的色彩、字級與動態效果則保留在 CSS。原先規劃的 PostgreSQL、Drizzle ORM、Zod 與 Vitest 沒有納入這一階段。
+UI 採用 Tailwind CSS 搭配原生 CSS：一次性的排版使用 Tailwind，共用的色彩、字級與動態效果則保留在 CSS。後續基礎設施階段已導入 Neon PostgreSQL、Cloudflare Hyperdrive、Drizzle ORM、Zod、Cloudflare KV、Wrangler 與 Vitest。
 
 ## 系統架構與資料流
 
 ```text
 Browser
+   │ GET /:code
+   ▼
+Cloudflare ES Module Worker
    │
-   ├── POST /api/urls ── 驗證網址、產生短碼
-   │                         │
-   │                         ▼
-   │                    PostgreSQL
+   ├── SHORT_URL_CACHE hit ───────────────▶ 302 / 404
    │
-   └── GET /:code ───── 查詢原始網址
-                             │
-                             ▼
-                         302 Redirect
+   └── miss → HYPERDRIVE → Neon PostgreSQL
+                         │
+                         └───────────────▶ 302 / 404 / 503
 ```
 
 預計依照責任拆分目錄：
@@ -65,11 +64,17 @@ MVP 的核心資料表為 `short_urls`，只保存 `id`、`original_url`、具�
 對外介面規劃如下：
 
 ```http
-POST /api/urls
 GET /:code
+GET /api/health/database
 ```
 
-`POST /api/urls` 接收原始網址並回傳短網址；`GET /:code` 找到資料後使用 `302` Redirect。若輸入格式錯誤會回傳 `400`，短碼不存在則回傳 `404`。
+目前只對外提供 Redirect 與 database health。建立／編輯／停用／刪除僅定義內部 mutation 與 cache synchronization contract，不提供公開 API。Redirect 只接受 `[A-Za-z0-9_-]{4,32}`；無效或不存在回 `404`，KV 與 PostgreSQL 都無法提供結果時回 `503`。
+
+## Worker deployment 與一致性邊界
+
+正式輸出使用 Nitro `cloudflare_module` preset、Wrangler Workers Assets、`nodejs_compat` 與 external `cloudflare:sockets`。舊版 Cloudflare Pages `npm run generate` 是歷史部署方式，目前使用 `npm run build` 與 `npm run deploy`。
+
+PostgreSQL 是 source of truth。KV 正向 value 不設 application TTL；mutation 主動 overwrite/delete。KV 跨區為最終一致，其他區域可能約 60 秒或更久仍讀到舊值。合法短碼查無時寫入 60 秒負向 value；Free plan 每日 1,000 次 writes 的耗盡風險需監控，但本階段不加入 Rate Limiting 或 Durable Object。
 
 ## 開發與交付規劃
 
