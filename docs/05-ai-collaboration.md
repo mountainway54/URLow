@@ -210,4 +210,89 @@ Apply preflight 曾發現 proposal 寫錯測試路徑。我先修正 artifacts �
 
 完成實作後，我又要求 AI 把手動驗證寫成可重現計畫，涵蓋建立、管理查詢、更新、停用、重新啟用、密碼邊界、錯誤狀態、限流與敏感資訊檢查。
 
+---
+
+## 六、用逐題決策把前端假資料換成真實 API
+
+後端管理能力完成後，我回到先前暫停的前端串接：
+
+> 「我要把前端的假資料換成真實API」
+
+這次我再次使用 `grill-me`，要求 AI 不要直接把現有 mock 行為逐字翻譯成 API request，而是逐題確認哪些前端行為應該保留、修改或移除。討論過程中，我先移除後端契約不支援的功能：
+
+> 「移除『修改密碼』欄位」
+
+管理頁因此只允許修改原始網址、備註與啟用狀態。查詢時仍輸入既有管理密碼，但密碼不會出現在 PATCH body，也不提供補設、修改或重設功能。
+
+接著，我補充一個實際的版面問題：
+
+> 「我發現啟用短網址開關沒有跟長網址input對齊」
+
+最後不是用固定像素硬推位置，而是讓標籤與控制項使用相同的 layout tracks。桌面版讓啟用開關與原始網址 input 的控制邊界對齊，手機版則改為單欄全寬。AI 以 1440 與 375 CSS pixels 的瀏覽器 viewport 檢查水平溢位與互動目標尺寸。
+
+錯誤處理方面，我沒有接受統一顯示「操作失敗」，而是要求：
+
+> 「精確錯誤提示」
+
+因此前端建立集中式 API boundary，先正規化 HTTP status、穩定 error code 與 validation issues，再由表單顯示繁體中文訊息。欄位驗證會對應到原始網址、管理密碼或備註；未識別或格式異常的錯誤則顯示通用服務訊息，不直接曝露 raw exception、server stack 或基礎設施內容。
+
+討論更新後的 KV 一致性提示時，我先問：
+
+> 「時間會差到多少」
+
+但精確寫成「60 秒或更久」容易讓使用者把它誤解成承諾，因此我要求：
+
+> 「舊設定可能持續約 60 秒或更久。寫的更模糊」
+
+再補充提示必須表達問題來自跨區同步：
+
+> 「要寫跨區」
+
+最後採用的文案是：
+
+> 「設定已儲存，跨區同步可能需要一些時間才會完全生效。」
+
+這段訊息只在 PATCH 已成功寫入、但 API 回傳 `cacheSynchronized=false` 時顯示。它代表資料已保存，只是不同地區的 Redirect 結果可能暫時尚未一致，不應被呈現成整次操作失敗。
+
+對建立與修改流程，我選擇不同的互動策略。建立與查詢會等待 API response，pending 時停用控制項並分別顯示「建立中…」或「查詢中…」，避免重複 request。修改則採用：
+
+> 「做樂觀更新」
+
+前端送出 PATCH 時立即保留使用者剛修改的畫面，同時保存最後一次由伺服器確認的 snapshot。若 PATCH 失敗，原始網址、備註與啟用狀態會一起 rollback；成功時則以 response 更新 snapshot。為避免多個 request 的回應順序互相覆蓋，儲存期間不允許重疊 PATCH。
+
+建立流程的細節也逐項確認。提交時按鈕顯示：
+
+> 「建立中」
+
+管理密碼仍是選填，但空白時必須持續顯示「未設定管理密碼，建立後將無法修改此短網址」。我另外明確要求：
+
+> 「不要跳確認視窗」
+
+所以這項不可逆決策使用表單內的持續提示，而不是提交後才用 modal 阻斷操作。管理查詢則同時接受 8 碼 Base62 短碼，或最後一段為該短碼的完整 HTTP(S) URL；格式不符時不發出 request。
+
+需求收斂後，我依序建立並套用 Spectra change：
+
+```text
+$spectra-propose
+$spectra-apply connect-frontend-to-short-url-api
+```
+
+AI 完成 typed API composable、建立表單、受保護管理查詢、樂觀 PATCH、錯誤映射、跨區提示、mock 移除與響應式版面測試。首頁不再載入 seed records，也不再產生 `demo-*` 短碼；重新整理後，資料來源只剩真實 API。
+
+本機整合測試時，建立短網址成功，但管理查詢曾出現：
+
+```text
+GET http://127.0.0.1:8787/api/short-urls/3O1wYbx9/management 503 (Service Unavailable)
+```
+
+這次我沒有把 `503` 當成前端錯誤直接改掉。AI 比較有無 `CF-Connecting-IP` 的 request，確認本機 Wrangler request 缺少 Cloudflare 注入的可信來源 IP，因此管理限流 identity 在進入資料庫與 bcrypt 前依安全設計 fail closed。解法也不是讓瀏覽器偽造 `CF-Connecting-IP`，而是只由專案的本機 dev wrapper 注入精確的 `URLOW_LOCAL_DEV=true` marker；管理 GET／PATCH 僅在缺少可信 IP 且 marker 完全符合時使用固定的 `local-dev` identity。正式或未標記環境仍維持 `503`，可信 Cloudflare IP 存在時也永遠優先。
+
+修正後，我重新以真實 HTTP 流程手動驗證建立、查詢與修改，確認成功，再完成完整測試、型別檢查與 Spectra 驗證。最後同步 delta specs 並封存：
+
+```text
+$spectra-archive connect-frontend-to-short-url-api
+```
+
+這次前端串接的重點並不是把 `$fetch` 塞進元件，而是先用 Prompt 決定不可逆提示、精確錯誤、樂觀更新與 rollback、跨區一致性文案，以及本機開發例外不能削弱正式環境安全邊界。自動化測試證明元件與契約一致，最後仍由我透過實際建立與修改完成端到端驗證。
+
 整個過程並不是用一段 Prompt 要 AI「完成短網址系統」，而是透過一連串 Prompt 逐步提供脈絡、要求證據、挑戰架構、限制範圍並指定驗證方式。AI 加快了探索與實作，但每一次真正改變系統方向的取捨，仍由我透過下一個 Prompt 明確做出。

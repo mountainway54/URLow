@@ -7,6 +7,7 @@ import {
   ManagementRateLimitedError,
   ManagementUnauthorizedError,
   managementRateLimitKey,
+  resolveManagementClientIdentity,
 } from '../../server/services/short-url-management'
 import { hashManagementPassword } from '../../server/services/management-password'
 
@@ -35,6 +36,18 @@ describe('short URL management authorization', () => {
 
   it('builds isolated IP and code keys', () => {
     expect(managementRateLimitKey('203.0.113.1', 'Abcd1234')).toBe('203.0.113.1:Abcd1234')
+  })
+
+  it('resolves local identity only from the exact dev marker', () => {
+    expect(resolveManagementClientIdentity(undefined, 'true')).toBe('local-dev')
+    expect(resolveManagementClientIdentity(undefined, true)).toBeUndefined()
+    expect(resolveManagementClientIdentity(undefined, 'TRUE')).toBeUndefined()
+    expect(resolveManagementClientIdentity(undefined, undefined)).toBeUndefined()
+  })
+
+  it('always prefers the trusted Cloudflare IP over the dev marker', () => {
+    expect(resolveManagementClientIdentity('203.0.113.10', 'true'))
+      .toBe('203.0.113.10')
   })
 
   it('authorizes after limiter and lookup', async () => {

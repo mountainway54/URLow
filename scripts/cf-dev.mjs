@@ -44,13 +44,23 @@ function parseDevVars(source) {
 
 const connectionString = parseDevVars(await readFile('.dev.vars', 'utf8'))
 const wranglerEntry = new URL('../node_modules/wrangler/bin/wrangler.js', import.meta.url)
-const child = spawn(process.execPath, [fileURLToPath(wranglerEntry), 'dev'], {
+const child = spawn(
+  process.execPath,
+  [
+    fileURLToPath(wranglerEntry),
+    'dev',
+    '--var',
+    'URLOW_LOCAL_DEV:true',
+    ...process.argv.slice(2),
+  ],
+  {
   stdio: 'inherit',
   env: {
     ...process.env,
     [variableName]: connectionString,
   },
-})
+  },
+)
 
 child.on('error', (error) => {
   console.error('Unable to start Wrangler', { errorType: error.name })

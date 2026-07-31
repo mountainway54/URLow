@@ -70,6 +70,14 @@ export function managementRateLimitKey(clientIp: string, code: string): string {
   return `${clientIp}:${code}`
 }
 
+export function resolveManagementClientIdentity(
+  trustedClientIp: string | undefined,
+  localDevMarker: unknown,
+): string | undefined {
+  if (trustedClientIp) return trustedClientIp
+  return localDevMarker === 'true' ? 'local-dev' : undefined
+}
+
 export async function authorizeManagement(
   code: string,
   presentedPassword: string | undefined,
