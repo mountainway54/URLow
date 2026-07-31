@@ -1,6 +1,12 @@
 import type { H3Event } from 'h3'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  managementErrorResponseSchema,
+  managementResponseSchema,
+  updateShortUrlResponseSchema,
+  validationErrorResponseSchema,
+} from '../../server/schemas/api-contract'
+import {
   ManagementForbiddenError,
   ManagementInfrastructureError,
   ManagementRateLimitedError,
@@ -95,6 +101,7 @@ describe('short URL management API', () => {
         hasManagementPassword: true,
       },
     })
+    expect(managementResponseSchema.safeParse(response).success).toBe(true)
     expect(JSON.stringify(response)).not.toContain('never-public')
   })
 
@@ -109,6 +116,7 @@ describe('short URL management API', () => {
     const response = await getHandler(requestEvent)
     expect(mocks.setResponseStatus).toHaveBeenCalledWith(requestEvent, status)
     expect(response).toMatchObject({ error: { code } })
+    expect(managementErrorResponseSchema.safeParse(response).success).toBe(true)
   })
 
   it('returns normalized PATCH metadata and cache synchronization state', async () => {
@@ -126,6 +134,7 @@ describe('short URL management API', () => {
         staleWindowWarning: expect.any(String),
       },
     })
+    expect(updateShortUrlResponseSchema.safeParse(response).success).toBe(true)
   })
 
   it('rejects an empty PATCH before authorization', async () => {
@@ -134,6 +143,7 @@ describe('short URL management API', () => {
     const response = await patchHandler(requestEvent)
     expect(mocks.setResponseStatus).toHaveBeenCalledWith(requestEvent, 400)
     expect(response).toMatchObject({ error: { code: 'VALIDATION_ERROR' } })
+    expect(validationErrorResponseSchema.safeParse(response).success).toBe(true)
     expect(mocks.update).not.toHaveBeenCalled()
   })
 })

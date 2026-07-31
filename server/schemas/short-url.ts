@@ -20,6 +20,10 @@ const absoluteHttpUrl = z.string()
       return false
     }
   }, 'originalUrl must use HTTP or HTTPS')
+  .meta({
+    description: '要縮短或更新的 HTTP(S) 絕對網址，會先移除前後空白。',
+    example: 'https://example.com/article',
+  })
 
 const optionalNote = z.union([
   z.string()
@@ -27,7 +31,10 @@ const optionalNote = z.union([
     .refine(value => value.length <= 240, 'note must be at most 240 characters')
     .transform(value => value || null),
   z.null(),
-])
+]).meta({
+  description: '私人備註；空字串或只有空白時會正規化為 null。',
+  example: '行銷活動連結',
+})
 
 export const createShortUrlBodySchema = z.strictObject({
   originalUrl: absoluteHttpUrl,
@@ -43,10 +50,16 @@ export const createShortUrlBodySchema = z.strictObject({
       'managementPassword must be 6-72 characters and at most 72 UTF-8 bytes',
     )
     .transform(value => value || undefined)
-    .optional(),
+    .optional()
+    .meta({
+      description: '選填的管理密碼，須為 6 至 72 個 Unicode 字元且不超過 72 UTF-8 bytes。',
+    }),
   note: optionalNote
     .optional()
     .transform(value => value ?? null),
+}).meta({
+  id: 'CreateShortUrlRequest',
+  description: '建立短網址的請求內容。',
 })
 
 export type CreateShortUrlBody = z.output<typeof createShortUrlBodySchema>
@@ -54,10 +67,16 @@ export type CreateShortUrlBody = z.output<typeof createShortUrlBodySchema>
 export const updateShortUrlBodySchema = z.strictObject({
   originalUrl: absoluteHttpUrl.optional(),
   note: optionalNote.optional(),
-  enabled: z.boolean().optional(),
+  enabled: z.boolean().optional().meta({
+    description: '短網址是否可繼續導向。',
+    example: true,
+  }),
 }).refine(
   value => Object.keys(value).length > 0,
   { message: 'At least one field is required' },
-)
+).meta({
+  id: 'UpdateShortUrlRequest',
+  description: '短網址管理欄位的部分更新內容，至少需要一個欄位。',
+})
 
 export type UpdateShortUrlBody = z.output<typeof updateShortUrlBodySchema>

@@ -1,6 +1,11 @@
 import type { H3Event } from 'h3'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  createShortUrlResponseSchema,
+  creationErrorResponseSchema,
+  validationErrorResponseSchema,
+} from '../../server/schemas/api-contract'
+import {
   ShortCodeGenerationExhaustedError,
 } from '../../server/services/short-url-creation'
 import { ShortUrlPersistenceError } from '../../server/services/short-url-repository'
@@ -66,7 +71,8 @@ describe('POST /api/short-urls', () => {
   it('returns the exact 201 response using the request origin', async () => {
     const requestEvent = event()
 
-    await expect(handler(requestEvent)).resolves.toEqual({
+    const response = await handler(requestEvent)
+    expect(response).toEqual({
       data: {
         code: 'aB3xY8qP',
         originalUrl: 'https://example.com/article',
@@ -76,6 +82,7 @@ describe('POST /api/short-urls', () => {
         hasManagementPassword: false,
       },
     })
+    expect(createShortUrlResponseSchema.safeParse(response).success).toBe(true)
     expect(mocks.setResponseStatus).toHaveBeenCalledWith(requestEvent, 201)
   })
 
@@ -83,9 +90,11 @@ describe('POST /api/short-urls', () => {
     mocks.body = { originalUrl: 'javascript:alert(1)' }
     const requestEvent = event()
 
-    await expect(handler(requestEvent)).resolves.toMatchObject({
+    const response = await handler(requestEvent)
+    expect(response).toMatchObject({
       error: { code: 'VALIDATION_ERROR' },
     })
+    expect(validationErrorResponseSchema.safeParse(response).success).toBe(true)
     expect(mocks.setResponseStatus).toHaveBeenCalledWith(requestEvent, 400)
     expect(mocks.createShortUrl).not.toHaveBeenCalled()
   })
@@ -129,6 +138,20 @@ describe('POST /api/short-urls', () => {
 
     expect(mocks.setResponseStatus).toHaveBeenCalledWith(requestEvent, status)
     expect(result).toEqual(body)
+    expect(creationErrorResponseSchema.safeParse(result).success).toBe(true)
     expect(JSON.stringify(result)).not.toMatch(/postgres|admin|password|neon|secret|stack/i)
+  })
+
+  it('detects a drifted creation response fixture', () => {
+    expect(createShortUrlResponseSchema.safeParse({
+      data: {
+        code: 'aB3xY8qP',
+        originalUrl: 'https://example.com/article',
+        shortUrl: 'https://urlow.example/aB3xY8qP',
+        note: null,
+        enabled: 'true',
+        hasManagementPassword: false,
+      },
+    }).success).toBe(false)
   })
 })

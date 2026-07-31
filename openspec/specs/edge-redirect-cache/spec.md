@@ -23,7 +23,7 @@ The system SHALL accept redirect codes matching `[A-Za-z0-9_-]{4,32}` and SHALL 
 ---
 ### Requirement: KV cached redirect resolution
 
-The `SHORT_URL_CACHE` binding SHALL store versioned discriminated JSON values. A positive value SHALL have the shape `{ "version": 1, "kind": "redirect", "targetUrl": string }`, SHALL contain an absolute HTTP(S) URL, and SHALL have no application expiration. A negative value SHALL have the shape `{ "version": 1, "kind": "missing" }` and SHALL be written with `expirationTtl: 60`.
+The `SHORT_URL_CACHE` binding SHALL store versioned discriminated JSON values. A positive value SHALL have the shape `{ "version": 1, "kind": "redirect", "targetUrl": string }`, SHALL contain an absolute HTTP(S) URL, and SHALL have no application expiration. A negative value SHALL have the shape `{ "version": 1, "kind": "missing" }` and SHALL be written with `expirationTtl: 60`. A disabled value SHALL have the shape `{ "version": 1, "kind": "gone" }` and SHALL have no application expiration.
 
 #### Scenario: Positive cache hit
 
@@ -35,6 +35,11 @@ The `SHORT_URL_CACHE` binding SHALL store versioned discriminated JSON values. A
 - **WHEN** a valid code resolves to a negative KV value
 - **THEN** the system returns HTTP 404 without creating a PostgreSQL client
 
+#### Scenario: Disabled cache hit
+
+- **WHEN** a valid code resolves to `{ "version": 1, "kind": "gone" }`
+- **THEN** the system returns HTTP 410 without creating a PostgreSQL client
+
 #### Scenario: Invalid cache value
 
 - **WHEN** a KV value cannot be parsed, has an unsupported version or kind, or contains a non-HTTP(S) target URL
@@ -43,22 +48,27 @@ The `SHORT_URL_CACHE` binding SHALL store versioned discriminated JSON values. A
 ---
 ### Requirement: Read-through PostgreSQL fallback
 
-On a KV miss or KV read failure, the system SHALL query the indexed `short_urls.code` field through Hyperdrive. A found row SHALL return HTTP 302 and schedule a positive KV write with `waitUntil`. A confirmed missing row SHALL return HTTP 404 and schedule a negative KV write with `expirationTtl: 60`. KV backfill failure MUST NOT delay or change the database-derived response.
+On a KV miss or KV read failure, the system SHALL query the indexed `short_urls.code` field through Hyperdrive and SHALL retrieve both `original_url` and `enabled`. A found enabled row SHALL return HTTP 302 and schedule a positive KV write with `waitUntil`. A found disabled row SHALL return HTTP 410 and schedule a disabled KV write with `waitUntil`. A confirmed missing row SHALL return HTTP 404 and schedule a negative KV write with `expirationTtl: 60`. KV backfill failure MUST NOT delay or change the database-derived response.
 
-#### Scenario: Cache miss finds a short URL
+#### Scenario: Cache miss finds an enabled short URL
 
-- **WHEN** KV has no usable value and PostgreSQL returns `https://example.com/target` for the code
+- **WHEN** KV has no usable value and PostgreSQL returns an enabled row for `https://example.com/target`
 - **THEN** the system returns HTTP 302 to that URL and schedules a positive KV backfill
+
+#### Scenario: Cache miss finds a disabled short URL
+
+- **WHEN** KV has no usable value and PostgreSQL returns a row whose `enabled` value is false
+- **THEN** the system returns HTTP 410 and schedules a disabled KV backfill
 
 #### Scenario: Cache miss confirms absence
 
 - **WHEN** KV has no usable value and PostgreSQL returns no row for a valid code
 - **THEN** the system returns HTTP 404 and schedules a 60-second negative KV backfill
 
-#### Scenario: Negative backfill exhausts KV quota
+#### Scenario: Backfill exhausts KV quota
 
-- **WHEN** PostgreSQL confirms that a valid code is absent and the negative KV write fails because of quota or a service error
-- **THEN** the system still returns HTTP 404 and logs a non-sensitive cache synchronization error
+- **WHEN** PostgreSQL derives a redirect, gone, or missing result and the corresponding KV write fails because of quota or a service error
+- **THEN** the system preserves the database-derived HTTP response and logs a non-sensitive cache synchronization error
 
 ---
 ### Requirement: Database outage redirect policy
@@ -83,7 +93,7 @@ A valid positive KV hit SHALL continue to return HTTP 302 and a negative KV hit 
 ---
 ### Requirement: Active cache synchronization for mutations
 
-Creating a short URL SHALL insert the PostgreSQL row before overwriting `redirect:<code>` with a positive KV value, including when the key currently contains a negative value. Updating a target URL SHALL delete the KV key before changing PostgreSQL and SHALL write the new positive value after the database update. Disabling or deleting a short URL SHALL delete the KV key before changing PostgreSQL. An initial KV delete failure MUST prevent the update, disable, or delete database mutation.
+Creating a short URL SHALL insert the PostgreSQL row before overwriting `redirect:<code>` with a positive KV value, including when the key currently contains a negative value. Updating an original URL, note, or enabled state SHALL delete the KV key before changing PostgreSQL. An initial KV delete failure MUST prevent the database update. After a successful database update, the system SHALL write a positive value when the resulting row is enabled and a disabled value when it is disabled. A post-update KV put failure MUST NOT roll back the database row; the mutation result SHALL expose `cacheSynchronized=false` and the fixed cross-region stale-window warning.
 
 #### Scenario: Creation overwrites a negative marker
 
@@ -96,15 +106,25 @@ Creating a short URL SHALL insert the PostgreSQL row before overwriting `redirec
 - **WHEN** PostgreSQL inserts a new short URL and the following KV overwrite fails
 - **THEN** the database row remains authoritative, no compensating database delete runs, and the mutation result exposes a cache synchronization failure to its caller
 
-#### Scenario: Target update invalidates before database mutation
+#### Scenario: Update invalidates before database mutation
 
-- **WHEN** the initial KV delete succeeds for an existing code
-- **THEN** the system updates PostgreSQL and then writes the new positive KV value
+- **WHEN** an authorized management PATCH targets an existing code and the initial KV delete succeeds
+- **THEN** the system applies the atomic PostgreSQL update and writes a cache value derived from the resulting enabled state and target URL
 
 #### Scenario: Initial invalidation fails
 
-- **WHEN** the initial KV delete fails during an update, disable, or delete operation
-- **THEN** the operation fails before changing PostgreSQL
+- **WHEN** the initial KV delete fails during a management update
+- **THEN** the operation returns an infrastructure failure before changing PostgreSQL
+
+#### Scenario: Post-update cache write fails
+
+- **WHEN** PostgreSQL commits the management update and the following KV put fails
+- **THEN** the API returns the committed metadata with `cacheSynchronized=false` and the stale-window warning
+
+#### Scenario: Disable and re-enable transition
+
+- **WHEN** an authorized PATCH first sets `enabled=false` and a later authorized PATCH sets `enabled=true`
+- **THEN** the first successful cache synchronization stores a gone value and the later synchronization stores a redirect value for the current target URL
 
 ---
 ### Requirement: Explicit KV consistency boundary

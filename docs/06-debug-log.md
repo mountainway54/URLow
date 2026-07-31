@@ -220,3 +220,95 @@ npm run build → success
 ```
 
 本機重複啟動 Wrangler 進行驗證時，曾因殘留的 `workerd`／Node 程序鎖住 `.output/public` 而出現 `EBUSY`。確認並停止屬於本專案的舊 `cf:dev` 程序樹後即可重新建置；不需要刪除資料庫或重建專案。
+
+## Swagger UI：`/api-docs` 回傳 404
+
+### 症狀
+
+OpenAPI JSON endpoint 可以正常使用：
+
+```text
+GET /api/openapi.json → 200 application/json
+```
+
+但 Swagger UI 頁面回傳：
+
+```text
+GET /api-docs → 404 text/html
+```
+
+回應內容其實已包含 `/api-docs` 的 Nuxt HTML 與 Swagger 樣式，因此不是頁面路由或靜態資源完全不存在。
+
+### 排查
+
+最初的 Swagger 頁面是在 `app/app.vue` 內透過 `useRoute()` 判斷路徑後切換元件。這種條件分支不會建立正式的 Nuxt 伺服器頁面路由，因此先改用 Nuxt Pages：
+
+```text
+app/pages/index.vue       → 首頁
+app/pages/api-docs.vue    → Swagger UI
+app/app.vue               → NuxtPage
+```
+
+重新建置後，Nitro 產物已註冊 `/api-docs`，但 HTTP 狀態仍是 `404`。進一步比較回應後發現：
+
+- `/api-docs` 回傳已渲染的 HTML，但狀態是 `404`。
+- 不存在的 `/not-a-real-page` 回傳 Nitro 的 JSON 404。
+- `/api/openapi.json` 維持正常的 `200`。
+
+這表示 `/api-docs` 已由 Nuxt renderer 處理，但在 renderer 執行前，其他程式先修改了 HTTP 狀態。
+
+### 原因
+
+`server/middleware/short-url-redirect.ts` 會將所有單段路徑視為可能的短碼。`/api-docs` 也是合法的單段短碼格式，因此 middleware 會查詢：
+
+```text
+code = api-docs
+```
+
+查無短網址後，middleware 將回應狀態設為 `404`；後續 Nuxt 雖然成功渲染 Swagger 頁面，仍沿用已被設定的 404 狀態。
+
+### 解法
+
+在短網址 middleware 中加入應交由 Nuxt 處理的保留頁面路徑：
+
+```ts
+const RESERVED_APP_PATHS = new Set(["/api-docs"]);
+```
+
+比對前會移除尾端斜線，因此以下兩個網址都會略過短碼查詢：
+
+```text
+/api-docs
+/api-docs/
+```
+
+並加入回歸測試，確認 middleware 不會對這兩個路徑讀取 KV、查詢資料庫或設定錯誤狀態。
+
+## Swagger UI：頁面回傳 200 但畫面空白
+
+### 症狀
+
+修正 404 後：
+
+```text
+GET /api-docs         → 200 text/html
+GET /api/openapi.json → 200 application/json
+```
+
+瀏覽器 Console 沒有顯示 JavaScript 錯誤，但頁面仍然沒有 Swagger UI 畫面。
+
+### 原因
+
+Swagger 元件原本使用：
+
+```text
+app/components/SwaggerApiDocs.client.vue
+```
+
+整個 `/api-docs` 頁面只包含這個 client-only 元件。伺服器端輸出的 HTML 因此只有空白 placeholder；在本機 Cloudflare runtime 中，該 placeholder 沒有成功換成實際 Swagger 元件，所以 `onMounted` 內的初始化也沒有執行。
+
+建置產物中雖然包含 Swagger UI bundle 與初始化程式，但伺服器端 HTML 沒有實際的 Swagger 掛載節點，因而呈現空白頁。
+
+### 解法
+
+將元件改為一般 Vue 元件，可由 SSR 輸出實際掛載節點，並在瀏覽器掛載後動態載入 Swagger UI

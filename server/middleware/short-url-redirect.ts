@@ -9,12 +9,20 @@ import { resolveRedirect } from '../services/short-url-cache'
 import { ShortUrlRepository } from '../services/short-url-repository'
 import { parseWorkerEnv } from '../utils/env'
 
+const RESERVED_APP_PATHS = new Set(['/api-docs'])
+
 export default defineEventHandler(async (event) => {
   if (!['GET', 'HEAD'].includes(getMethod(event))) {
     return
   }
 
-  const pathMatch = /^\/([^/]+)\/?$/u.exec(getRequestURL(event).pathname)
+  const pathname = getRequestURL(event).pathname
+  const appPath = pathname.length > 1 ? pathname.replace(/\/$/u, '') : pathname
+  if (RESERVED_APP_PATHS.has(appPath)) {
+    return
+  }
+
+  const pathMatch = /^\/([^/]+)\/?$/u.exec(pathname)
   if (!pathMatch) {
     return
   }
