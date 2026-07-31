@@ -1,19 +1,26 @@
 import {
+  encodeGoneValue,
   encodeRedirectValue,
   redirectCacheKey,
   type RedirectCache,
 } from './short-url-cache'
+import type { ManagementRecord } from './short-url-management'
 
 export const KV_STALE_WINDOW_WARNING = 'Other regions may observe an older redirect for approximately 60 seconds or longer.'
 
 export interface ShortUrlCreationStore {
-  insert(code: string, targetUrl: string): Promise<void>
+  insert(
+    code: string,
+    targetUrl: string,
+    metadata?: { managementPasswordHash: string | null, note: string | null },
+  ): Promise<void>
 }
 
 export interface ShortUrlMutationStore extends ShortUrlCreationStore {
-  updateTarget(code: string, targetUrl: string): Promise<void>
-  disable(code: string): Promise<void>
-  delete(code: string): Promise<void>
+  updateManagement(
+    code: string,
+    input: { originalUrl?: string, note?: string | null, enabled?: boolean },
+  ): Promise<ManagementRecord | null>
 }
 
 export interface MutationResult {
@@ -27,8 +34,15 @@ export class ShortUrlCreationCoordinator {
     private readonly creationStore: ShortUrlCreationStore,
   ) {}
 
-  async create(code: string, targetUrl: string): Promise<MutationResult> {
-    await this.creationStore.insert(code, targetUrl)
+  async create(
+    code: string,
+    targetUrl: string,
+    metadata: { managementPasswordHash: string | null, note: string | null } = {
+      managementPasswordHash: null,
+      note: null,
+    },
+  ): Promise<MutationResult> {
+    await this.creationStore.insert(code, targetUrl, metadata)
 
     try {
       await this.cache.put(redirectCacheKey(code), encodeRedirectValue(targetUrl))
@@ -58,28 +72,28 @@ export class ShortUrlMutationCoordinator extends ShortUrlCreationCoordinator {
     super(cache, store)
   }
 
-  async updateTarget(code: string, targetUrl: string): Promise<MutationResult> {
+  async update(
+    code: string,
+    input: { originalUrl?: string, note?: string | null, enabled?: boolean },
+  ): Promise<MutationResult & { row: ManagementRecord | null }> {
     await this.cache.delete(redirectCacheKey(code))
-    await this.store.updateTarget(code, targetUrl)
+    const row = await this.store.updateManagement(code, input)
+    if (row === null) {
+      return { ...this.result(true), row: null }
+    }
 
     try {
-      await this.cache.put(redirectCacheKey(code), encodeRedirectValue(targetUrl))
-      return this.result(true)
+      await this.cache.put(
+        redirectCacheKey(code),
+        row.enabled ? encodeRedirectValue(row.originalUrl) : encodeGoneValue(),
+      )
+      return { ...this.result(true), row }
     }
-    catch {
-      return this.result(false)
+    catch (error) {
+      console.error('Short URL cache synchronization failed', {
+        errorType: error instanceof Error ? error.name : 'UnknownError',
+      })
+      return { ...this.result(false), row }
     }
-  }
-
-  async disable(code: string): Promise<MutationResult> {
-    await this.cache.delete(redirectCacheKey(code))
-    await this.store.disable(code)
-    return this.result(true)
-  }
-
-  async delete(code: string): Promise<MutationResult> {
-    await this.cache.delete(redirectCacheKey(code))
-    await this.store.delete(code)
-    return this.result(true)
   }
 }

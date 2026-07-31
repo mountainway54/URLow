@@ -42,6 +42,7 @@ describe('route-scoped short URL request validation', () => {
 
     await expect(handler(event())).resolves.toEqual({
       originalUrl: 'https://example.com/path?source=test',
+      note: null,
     })
     expect(route).toHaveBeenCalledOnce()
   })
@@ -80,7 +81,7 @@ describe('route-scoped short URL request validation', () => {
     const route = vi.fn(async (_event, body) => body)
 
     await expect(withValidatedBody(createShortUrlBodySchema, route)(event()))
-      .resolves.toEqual({ originalUrl: value })
+      .resolves.toEqual({ originalUrl: value, note: null })
   })
 
   it('normalizes malformed JSON to the same safe 400 contract', async () => {

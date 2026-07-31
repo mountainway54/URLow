@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   encodeMissingValue,
+  encodeGoneValue,
   encodeRedirectValue,
   resolveRedirect,
 } from '../../server/services/short-url-cache'
@@ -42,6 +43,13 @@ describe('KV read-through redirect resolution', () => {
     expect(dependencies.repository.findTargetByCode).not.toHaveBeenCalled()
   })
 
+  it('returns a gone hit without PostgreSQL', async () => {
+    const dependencies = setup(encodeGoneValue())
+    await expect(resolveRedirect('nuxt-guide', dependencies.cache, dependencies.repository, dependencies.context))
+      .resolves.toEqual({ status: 410 })
+    expect(dependencies.repository.findTargetByCode).not.toHaveBeenCalled()
+  })
+
   it.each([
     'not-json',
     '{"version":2,"kind":"missing"}',
@@ -49,7 +57,10 @@ describe('KV read-through redirect resolution', () => {
     '{"version":1,"kind":"redirect","targetUrl":"javascript:alert(1)"}',
   ])('treats invalid cache value as a miss: %s', async (rawValue) => {
     const dependencies = setup(rawValue)
-    dependencies.repository.findTargetByCode.mockResolvedValue('https://example.com/target')
+    dependencies.repository.findTargetByCode.mockResolvedValue({
+      targetUrl: 'https://example.com/target',
+      enabled: true,
+    })
     await expect(resolveRedirect('nuxt-guide', dependencies.cache, dependencies.repository, dependencies.context))
       .resolves.toEqual({ status: 302, targetUrl: 'https://example.com/target' })
     expect(dependencies.repository.findTargetByCode).toHaveBeenCalledOnce()
@@ -58,14 +69,20 @@ describe('KV read-through redirect resolution', () => {
   it('falls back to PostgreSQL after a KV read error', async () => {
     const dependencies = setup()
     dependencies.cache.get.mockRejectedValue(new Error('KV unavailable'))
-    dependencies.repository.findTargetByCode.mockResolvedValue('https://example.com/target')
+    dependencies.repository.findTargetByCode.mockResolvedValue({
+      targetUrl: 'https://example.com/target',
+      enabled: true,
+    })
     await expect(resolveRedirect('nuxt-guide', dependencies.cache, dependencies.repository, dependencies.context))
       .resolves.toEqual({ status: 302, targetUrl: 'https://example.com/target' })
   })
 
   it('schedules a positive backfill when PostgreSQL finds a row', async () => {
     const dependencies = setup()
-    dependencies.repository.findTargetByCode.mockResolvedValue('https://example.com/target')
+    dependencies.repository.findTargetByCode.mockResolvedValue({
+      targetUrl: 'https://example.com/target',
+      enabled: true,
+    })
     await expect(resolveRedirect('nuxt-guide', dependencies.cache, dependencies.repository, dependencies.context))
       .resolves.toEqual({ status: 302, targetUrl: 'https://example.com/target' })
     expect(dependencies.cache.put).toHaveBeenCalledWith(
@@ -73,6 +90,20 @@ describe('KV read-through redirect resolution', () => {
       encodeRedirectValue('https://example.com/target'),
     )
     expect(dependencies.context.waitUntil).toHaveBeenCalledOnce()
+  })
+
+  it('schedules a gone backfill when PostgreSQL finds a disabled row', async () => {
+    const dependencies = setup()
+    dependencies.repository.findTargetByCode.mockResolvedValue({
+      targetUrl: 'https://example.com/target',
+      enabled: false,
+    })
+    await expect(resolveRedirect('nuxt-guide', dependencies.cache, dependencies.repository, dependencies.context))
+      .resolves.toEqual({ status: 410 })
+    expect(dependencies.cache.put).toHaveBeenCalledWith(
+      'redirect:nuxt-guide',
+      encodeGoneValue(),
+    )
   })
 
   it('schedules a 60-second negative backfill when PostgreSQL confirms absence', async () => {

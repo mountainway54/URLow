@@ -1,6 +1,10 @@
 import type { H3Event } from 'h3'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { encodeMissingValue, encodeRedirectValue } from '../../server/services/short-url-cache'
+import {
+  encodeGoneValue,
+  encodeMissingValue,
+  encodeRedirectValue,
+} from '../../server/services/short-url-cache'
 
 const mocks = vi.hoisted(() => ({
   code: 'nuxt-guide',
@@ -103,9 +107,19 @@ describe('GET /:code redirect middleware', () => {
     expect(mocks.findTargetByCode).not.toHaveBeenCalled()
   })
 
+  it('returns 410 for a disabled cache hit', async () => {
+    const { event } = eventWithCache(encodeGoneValue())
+    await handler(event)
+    expect(mocks.setResponseStatus).toHaveBeenCalledWith(event, 410)
+    expect(mocks.findTargetByCode).not.toHaveBeenCalled()
+  })
+
   it('returns a database-derived redirect and only schedules cache backfill', async () => {
     const { event, cache } = eventWithCache(null)
-    mocks.findTargetByCode.mockResolvedValue('https://example.com/target')
+    mocks.findTargetByCode.mockResolvedValue({
+      targetUrl: 'https://example.com/target',
+      enabled: true,
+    })
     await handler(event)
     expect(mocks.findTargetByCode).toHaveBeenCalledWith('nuxt-guide')
     expect(mocks.sendRedirect).toHaveBeenCalledWith(event, 'https://example.com/target', 302)

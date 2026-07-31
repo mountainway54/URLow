@@ -1,7 +1,7 @@
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import pg from 'pg'
 import type { H3Event } from 'h3'
-import { parseHyperdriveBinding } from '../utils/env'
+import { parseHyperdriveBinding, type HyperdriveBinding } from '../utils/env'
 import * as schema from './schema'
 
 export type Database = NodePgDatabase<typeof schema>
@@ -9,7 +9,7 @@ export type Database = NodePgDatabase<typeof schema>
 type PgClient = Pick<pg.Client, 'connect' | 'end'> & pg.Client
 type ClientFactory = (connectionString: string) => PgClient
 
-function getHyperdrive(event: H3Event): Hyperdrive {
+function getHyperdrive(event: H3Event): HyperdriveBinding {
   const cloudflare = event.context.cloudflare as { env?: { HYPERDRIVE?: unknown } } | undefined
   return parseHyperdriveBinding(cloudflare?.env?.HYPERDRIVE)
 }

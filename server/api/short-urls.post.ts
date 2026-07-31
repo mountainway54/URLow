@@ -13,7 +13,7 @@ export default withValidatedBody(createShortUrlBodySchema, async (event, body) =
     const env = parseWorkerEnv(cloudflare?.env)
     const repository = new ShortUrlRepository(event)
     const coordinator = new ShortUrlCreationCoordinator(env.SHORT_URL_CACHE, repository)
-    const result = await createShortUrl(body.originalUrl, coordinator)
+    const result = await createShortUrl(body, coordinator)
     const origin = getRequestURL(event).origin
 
     setResponseStatus(event, 201)
@@ -22,6 +22,9 @@ export default withValidatedBody(createShortUrlBodySchema, async (event, body) =
         code: result.code,
         originalUrl: result.originalUrl,
         shortUrl: `${origin}/${result.code}`,
+        note: result.note,
+        enabled: result.enabled,
+        hasManagementPassword: result.hasManagementPassword,
       },
     }
   }
