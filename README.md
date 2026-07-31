@@ -1,10 +1,10 @@
 <div align="center">
 
 # URLow
-
+[urlow.mw7.workers.dev](https://urlow.mw7.workers.dev/)
 ### 部署在 Cloudflare Workers 的縮網址服務
 
-[線上體驗](https://urlow.mw7.workers.dev/) · [API 文件](https://urlow.mw7.workers.dev/api-docs) · [開發文件](./docs/開發文件總覽.md)
+ [API 文件](https://urlow.mw7.workers.dev/api-docs) · [開發文件](./docs/開發文件總覽.md)
 
 ![Nuxt](https://img.shields.io/badge/Nuxt-4.5-00DC82?logo=nuxtdotjs&logoColor=white)
 ![Vue](https://img.shields.io/badge/Vue-3.5-42B883?logo=vuedotjs&logoColor=white)
