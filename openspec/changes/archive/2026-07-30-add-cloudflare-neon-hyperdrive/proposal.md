@@ -30,7 +30,7 @@ URLow 已由靜態 Cloudflare Pages 部署轉為 Cloudflare Worker 動態版本�
 - Affected specs: `cloudflare-postgres-runtime`, `edge-redirect-cache`
 - Affected code:
   - New: `wrangler.jsonc`, `drizzle.config.ts`, `server/database/client.ts`, `server/database/schema.ts`, `server/utils/env.ts`, `server/services/short-url-cache.ts`, `server/services/short-url-repository.ts`, `server/routes/[code].get.ts`, `server/api/health/database.get.ts`, `tests/server/database-client.test.ts`, `tests/server/database-health.test.ts`, `tests/server/short-url-cache.test.ts`, `tests/server/redirect.test.ts`, `drizzle/`, `.env.example`, `.dev.vars.example`
-  - Modified: `package.json`, `package-lock.json`, `nuxt.config.ts`, `.gitignore`, `README.md`, `docs/01-architecture-and-tech-stack.md`, `docs/06-debug-log.md`
+  - Modified: `package.json`, `package-lock.json`, `nuxt.config.ts`, `.gitignore`, `README.md`, `docs/架構設計與技術選型.md`, `docs/除錯紀錄.md`
   - Removed: none
 - Affected dependencies: Neon PostgreSQL、Cloudflare Hyperdrive、Drizzle ORM、PostgreSQL driver、Drizzle Kit、Zod、Wrangler、Vitest
 - Affected systems: Cloudflare Worker bindings、Cloudflare KV、Neon database、local development environment
