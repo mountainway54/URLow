@@ -55,6 +55,9 @@ describe('POST /api/short-urls', () => {
     mocks.createShortUrl.mockResolvedValue({
       code: 'aB3xY8qP',
       originalUrl: 'https://example.com/article',
+      note: null,
+      enabled: true,
+      hasManagementPassword: false,
       cacheSynchronized: true,
     })
     vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -68,6 +71,9 @@ describe('POST /api/short-urls', () => {
         code: 'aB3xY8qP',
         originalUrl: 'https://example.com/article',
         shortUrl: 'https://urlow.example/aB3xY8qP',
+        note: null,
+        enabled: true,
+        hasManagementPassword: false,
       },
     })
     expect(mocks.setResponseStatus).toHaveBeenCalledWith(requestEvent, 201)

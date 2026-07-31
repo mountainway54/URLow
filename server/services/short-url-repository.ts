@@ -1,9 +1,14 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import { withDatabase } from '../database/client'
 import { shortUrls } from '../database/schema'
 import type { RedirectLookup } from './short-url-cache'
 import type { ShortUrlCreationStore } from './short-url-mutations'
+import type {
+  ManagementMutationInput,
+  ManagementRecord,
+  ShortUrlManagementStore,
+} from './short-url-management'
 
 export class ShortCodeCollisionError extends Error {
   constructor() {
@@ -32,15 +37,24 @@ export function isShortCodeConstraintViolation(error: unknown): boolean {
     && databaseError.constraint === 'short_urls_code_unique'
 }
 
-export class ShortUrlRepository implements RedirectLookup, ShortUrlCreationStore {
+export class ShortUrlRepository implements RedirectLookup, ShortUrlCreationStore, ShortUrlManagementStore {
   constructor(private readonly event: H3Event) {}
 
-  async insert(code: string, targetUrl: string): Promise<void> {
+  async insert(
+    code: string,
+    targetUrl: string,
+    metadata: { managementPasswordHash: string | null, note: string | null } = {
+      managementPasswordHash: null,
+      note: null,
+    },
+  ): Promise<void> {
     try {
       await withDatabase(this.event, async (database) => {
         await database.insert(shortUrls).values({
           code,
           originalUrl: targetUrl,
+          managementPasswordHash: metadata.managementPasswordHash,
+          note: metadata.note,
         })
       })
     }
@@ -56,15 +70,77 @@ export class ShortUrlRepository implements RedirectLookup, ShortUrlCreationStore
     }
   }
 
-  async findTargetByCode(code: string): Promise<string | null> {
+  async findTargetByCode(code: string): Promise<{ targetUrl: string, enabled: boolean } | null> {
     return withDatabase(this.event, async (database) => {
       const rows = await database
-        .select({ targetUrl: shortUrls.originalUrl })
+        .select({
+          targetUrl: shortUrls.originalUrl,
+          enabled: shortUrls.enabled,
+        })
         .from(shortUrls)
         .where(eq(shortUrls.code, code))
         .limit(1)
 
-      return rows[0]?.targetUrl ?? null
+      return rows[0] ?? null
     })
+  }
+
+  async findManagementByCode(code: string): Promise<ManagementRecord | null> {
+    try {
+      return await withDatabase(this.event, async (database) => {
+        const rows = await database
+          .select({
+            code: shortUrls.code,
+            originalUrl: shortUrls.originalUrl,
+            managementPasswordHash: shortUrls.managementPasswordHash,
+            note: shortUrls.note,
+            enabled: shortUrls.enabled,
+            createdAt: shortUrls.createdAt,
+            updatedAt: shortUrls.updatedAt,
+          })
+          .from(shortUrls)
+          .where(eq(shortUrls.code, code))
+          .limit(1)
+
+        return rows[0] ?? null
+      })
+    }
+    catch (error) {
+      console.error('Short URL management lookup failed', {
+        errorType: error instanceof Error ? error.name : 'UnknownError',
+      })
+      throw new ShortUrlPersistenceError(error)
+    }
+  }
+
+  async updateManagement(code: string, input: ManagementMutationInput): Promise<ManagementRecord | null> {
+    try {
+      return await withDatabase(this.event, async (database) => {
+        const rows = await database
+          .update(shortUrls)
+          .set({
+            ...input,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(shortUrls.code, code))
+          .returning({
+            code: shortUrls.code,
+            originalUrl: shortUrls.originalUrl,
+            managementPasswordHash: shortUrls.managementPasswordHash,
+            note: shortUrls.note,
+            enabled: shortUrls.enabled,
+            createdAt: shortUrls.createdAt,
+            updatedAt: shortUrls.updatedAt,
+          })
+
+        return rows[0] ?? null
+      })
+    }
+    catch (error) {
+      console.error('Short URL management update failed', {
+        errorType: error instanceof Error ? error.name : 'UnknownError',
+      })
+      throw new ShortUrlPersistenceError(error)
+    }
   }
 }

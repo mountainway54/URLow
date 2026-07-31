@@ -39,6 +39,9 @@ describe('short URL creation orchestration', () => {
       .resolves.toEqual({
         code: 'aB3xY8qP',
         originalUrl: 'https://example.com/article',
+        note: null,
+        enabled: true,
+        hasManagementPassword: false,
         cacheSynchronized: true,
       })
     expect(mutation.create).toHaveBeenCalledOnce()
@@ -56,8 +59,18 @@ describe('short URL creation orchestration', () => {
     await expect(createShortUrl('https://example.com', mutation, generate))
       .resolves.toMatchObject({ code: 'BBBBBBBB' })
     expect(mutation.create).toHaveBeenCalledTimes(2)
-    expect(mutation.create).toHaveBeenNthCalledWith(1, 'AAAAAAAA', 'https://example.com')
-    expect(mutation.create).toHaveBeenNthCalledWith(2, 'BBBBBBBB', 'https://example.com')
+    expect(mutation.create).toHaveBeenNthCalledWith(
+      1,
+      'AAAAAAAA',
+      'https://example.com',
+      { managementPasswordHash: null, note: null },
+    )
+    expect(mutation.create).toHaveBeenNthCalledWith(
+      2,
+      'BBBBBBBB',
+      'https://example.com',
+      { managementPasswordHash: null, note: null },
+    )
   })
 
   it('stops after five collisions without a sixth insert attempt', async () => {
@@ -100,7 +113,35 @@ describe('short URL creation orchestration', () => {
     )).resolves.toEqual({
       code: 'AAAAAAAA',
       originalUrl: 'https://example.com',
+      note: null,
+      enabled: true,
+      hasManagementPassword: false,
       cacheSynchronized: false,
     })
+  })
+
+  it('hashes management password once and passes only the hash to persistence', async () => {
+    const mutation = coordinator()
+    const hashPassword = vi.fn().mockResolvedValue('$2b$10$stored')
+
+    await expect(createShortUrl(
+      {
+        originalUrl: 'https://example.com',
+        managementPassword: 'secret12',
+        note: 'private',
+      },
+      mutation,
+      vi.fn().mockReturnValue('AAAAAAAA'),
+      hashPassword,
+    )).resolves.toMatchObject({
+      note: 'private',
+      hasManagementPassword: true,
+    })
+    expect(hashPassword).toHaveBeenCalledWith('secret12')
+    expect(mutation.create).toHaveBeenCalledWith(
+      'AAAAAAAA',
+      'https://example.com',
+      { managementPasswordHash: '$2b$10$stored', note: 'private' },
+    )
   })
 })

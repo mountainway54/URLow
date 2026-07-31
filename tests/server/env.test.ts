@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { parseHyperdriveBinding } from '../../server/utils/env'
+import {
+  parseHyperdriveBinding,
+  parseManagementRateLimiter,
+} from '../../server/utils/env'
 import { parseMigrationDatabaseUrl } from '../../server/utils/migration-env'
 
 describe('migration configuration', () => {
@@ -28,4 +31,11 @@ describe('runtime configuration', () => {
     'rejects a missing or malformed Hyperdrive binding',
     (value) => expect(() => parseHyperdriveBinding(value)).toThrow(),
   )
+
+  it('accepts only a callable management rate limiter binding', () => {
+    const limiter = { limit: async () => ({ success: true }) }
+    expect(parseManagementRateLimiter(limiter)).toBe(limiter)
+    expect(() => parseManagementRateLimiter(undefined)).toThrow()
+    expect(() => parseManagementRateLimiter({ limit: true })).toThrow()
+  })
 })

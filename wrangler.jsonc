@@ -28,5 +28,15 @@
       "binding": "SHORT_URL_CACHE",
       "id": "9da24c21c7f4406fbb97e9abc424e22b"
     }
+  ],
+  "ratelimits": [
+    {
+      "name": "MANAGEMENT_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
+    }
   ]
 }

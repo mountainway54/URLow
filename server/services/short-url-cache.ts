@@ -17,12 +17,17 @@ const cacheValueSchema = z.discriminatedUnion('kind', [
     version: z.literal(1),
     kind: z.literal('missing'),
   }),
+  z.object({
+    version: z.literal(1),
+    kind: z.literal('gone'),
+  }),
 ])
 
 export type RedirectCacheValue = z.infer<typeof cacheValueSchema>
 export type RedirectResolution =
   | { status: 302, targetUrl: string }
   | { status: 404 }
+  | { status: 410 }
   | { status: 503 }
 
 export interface RedirectCache {
@@ -32,7 +37,7 @@ export interface RedirectCache {
 }
 
 export interface RedirectLookup {
-  findTargetByCode(code: string): Promise<string | null>
+  findTargetByCode(code: string): Promise<{ targetUrl: string, enabled: boolean } | null>
 }
 
 export interface RedirectContext {
@@ -57,6 +62,10 @@ export function encodeRedirectValue(targetUrl: string): string {
 
 export function encodeMissingValue(): string {
   return JSON.stringify({ version: 1, kind: 'missing' } satisfies RedirectCacheValue)
+}
+
+export function encodeGoneValue(): string {
+  return JSON.stringify({ version: 1, kind: 'gone' } satisfies RedirectCacheValue)
 }
 
 export function decodeCacheValue(value: string): RedirectCacheValue | null {
@@ -107,12 +116,21 @@ export async function resolveRedirect(
     return { status: 404 }
   }
 
-  try {
-    const targetUrl = await repository.findTargetByCode(code)
+  if (cachedValue?.kind === 'gone') {
+    return { status: 410 }
+  }
 
-    if (targetUrl !== null) {
-      scheduleBackfill(context, cache.put(key, encodeRedirectValue(targetUrl)))
-      return { status: 302, targetUrl }
+  try {
+    const row = await repository.findTargetByCode(code)
+
+    if (row !== null) {
+      if (!row.enabled) {
+        scheduleBackfill(context, cache.put(key, encodeGoneValue()))
+        return { status: 410 }
+      }
+
+      scheduleBackfill(context, cache.put(key, encodeRedirectValue(row.targetUrl)))
+      return { status: 302, targetUrl: row.targetUrl }
     }
 
     scheduleBackfill(context, cache.put(key, encodeMissingValue(), { expirationTtl: 60 }))
