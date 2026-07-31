@@ -7,12 +7,12 @@
   --iris-reflection: #8176ff;
   --ink: #14213d;
   --muted-slate: #667085;
-  --urlow-text-xs: 0.72rem;
-  --urlow-text-sm: 0.78rem;
-  --urlow-text-base: 0.84rem;
-  --urlow-text-body: 0.88rem;
-  --urlow-text-lg: 1.15rem;
-  --urlow-text-title: 1.48rem;
+  --urlow-text-xs: 0.68rem;
+  --urlow-text-sm: 0.73rem;
+  --urlow-text-base: 0.79rem;
+  --urlow-text-body: 0.82rem;
+  --urlow-text-lg: 1.06rem;
+  --urlow-text-title: 1.34rem;
   --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, monospace;
@@ -51,7 +51,7 @@ textarea {
 }
 
 .glass-panel {
-  padding: 34px;
+  padding: 28px;
   border: 1px solid rgba(255, 255, 255, 0.78);
   border-radius: 30px;
   background: var(--ice-glass);
@@ -69,13 +69,13 @@ textarea {
 }
 
 .field {
-  margin-bottom: 22px;
+  margin-bottom: 17px;
 }
 
 .field > label,
 .label-row label {
   display: inline-block;
-  margin-bottom: 9px;
+  margin-bottom: 7px;
   color: var(--ink);
   font-size: var(--urlow-text-body);
   font-weight: 650;
@@ -92,13 +92,26 @@ textarea {
   font-size: var(--urlow-text-xs);
 }
 
+.label-row-feedback {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+  text-align: right;
+}
+
+.label-row-feedback .error-message {
+  color: #c2353f;
+}
+
 .input-shell {
   display: flex;
   align-items: center;
   min-width: 0;
-  min-height: 52px;
+  min-height: 46px;
   border: 1px solid rgba(102, 112, 133, 0.17);
-  border-radius: 15px;
+  border-radius: 13px;
   background: rgba(255, 255, 255, 0.66);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
   transition: border-color 160ms ease, box-shadow 160ms ease;
@@ -112,8 +125,8 @@ textarea {
 .input-shell input {
   width: 100%;
   min-width: 0;
-  height: 50px;
-  padding: 0 15px;
+  height: 44px;
+  padding: 0 13px;
   color: var(--ink);
   border: 0;
   outline: 0;
@@ -127,8 +140,8 @@ textarea::placeholder {
 
 .field-icon {
   display: grid;
-  flex: 0 0 48px;
-  height: 50px;
+  flex: 0 0 44px;
+  height: 44px;
   place-items: center;
   color: var(--muted-slate);
 }
@@ -136,8 +149,8 @@ textarea::placeholder {
 .field-icon svg,
 .icon-button svg,
 .primary-button svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -149,7 +162,7 @@ textarea::placeholder {
 }
 
 .input-shell--mono {
-  padding-left: 15px;
+  padding-left: 13px;
   font-family: var(--font-mono);
   font-size: var(--urlow-text-base);
 }
@@ -161,25 +174,25 @@ textarea::placeholder {
 
 .icon-button {
   display: grid;
-  flex: 0 0 48px;
-  min-height: 48px;
+  flex: 0 0 44px;
+  min-height: 44px;
   margin-right: 2px;
   place-items: center;
   color: var(--muted-slate);
   border: 0;
-  border-radius: 13px;
+  border-radius: 11px;
   background: transparent;
   cursor: pointer;
 }
 
 textarea {
   width: 100%;
-  min-height: 96px;
+  min-height: 82px;
   resize: vertical;
-  padding: 14px 15px;
+  padding: 11px 13px;
   color: var(--ink);
   border: 1px solid rgba(102, 112, 133, 0.17);
-  border-radius: 15px;
+  border-radius: 13px;
   outline: 0;
   background: rgba(255, 255, 255, 0.66);
   line-height: 1.5;
@@ -193,13 +206,13 @@ textarea:focus {
 .primary-button {
   display: flex;
   width: 100%;
-  min-height: 50px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
-  gap: 9px;
+  gap: 7px;
   color: #fff;
   border: 0;
-  border-radius: 16px;
+  border-radius: 13px;
   background: linear-gradient(110deg, var(--sky-blue), #247fe9);
   box-shadow:
     0 14px 28px rgba(22, 137, 255, 0.24),
@@ -209,8 +222,8 @@ textarea:focus {
 }
 
 .lookup-submit {
-  height: 52px;
-  min-height: 52px;
+  height: 46px;
+  min-height: 46px;
   box-shadow: none;
 }
 
@@ -218,13 +231,48 @@ textarea:focus {
   box-shadow: none;
 }
 
+.management-save-button {
+  box-shadow: none;
+}
+
 .lookup-form .field {
   margin-bottom: 0;
 }
 
+.management-primary-fields {
+  align-items: start;
+}
+
+.management-primary-fields > .field {
+  margin-bottom: 0;
+}
+
+.enabled-toggle-field {
+  width: 180px;
+}
+
+.enabled-toggle-heading {
+  display: inline-block;
+  margin-bottom: 7px;
+  color: var(--ink);
+  font-size: var(--urlow-text-body);
+  font-weight: 650;
+}
+
+.enabled-toggle-control {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 13px;
+  border: 1px solid rgba(102, 112, 133, 0.13);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
 .form-message {
-  min-height: 20px;
-  margin: 7px 2px 0;
+  min-height: 17px;
+  margin: 5px 2px 0;
   font-size: var(--urlow-text-sm);
 }
 
@@ -267,10 +315,14 @@ textarea:focus-visible {
 
 @media (max-width: 700px) {
   .glass-panel {
-    padding: 23px 18px;
-    border-radius: 24px;
+    padding: 20px 16px;
+    border-radius: 22px;
     backdrop-filter: blur(20px) saturate(135%);
     -webkit-backdrop-filter: blur(20px) saturate(135%);
+  }
+
+  .enabled-toggle-field {
+    width: 100%;
   }
 }
 

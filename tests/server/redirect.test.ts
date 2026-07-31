@@ -86,6 +86,20 @@ describe('GET /:code redirect middleware', () => {
     expect(mocks.findTargetByCode).not.toHaveBeenCalled()
   })
 
+  it.each(['api-docs', 'api-docs/'])(
+    'lets the Nuxt renderer handle the API documentation path /%s',
+    async (path) => {
+      mocks.code = path
+      const { event, cache } = eventWithCache(null)
+
+      await expect(handler(event)).resolves.toBeUndefined()
+
+      expect(mocks.setResponseStatus).not.toHaveBeenCalled()
+      expect(cache.get).not.toHaveBeenCalled()
+      expect(mocks.findTargetByCode).not.toHaveBeenCalled()
+    },
+  )
+
   it('returns a positive cache hit without database access or writes', async () => {
     const { event, cache } = eventWithCache(encodeRedirectValue('https://example.com/target'))
     await expect(handler(event)).resolves.toEqual({

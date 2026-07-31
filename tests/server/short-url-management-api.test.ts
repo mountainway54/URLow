@@ -1,6 +1,12 @@
 import type { H3Event } from 'h3'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  managementErrorResponseSchema,
+  managementResponseSchema,
+  updateShortUrlResponseSchema,
+  validationErrorResponseSchema,
+} from '../../server/schemas/api-contract'
+import {
   ManagementForbiddenError,
   ManagementInfrastructureError,
   ManagementRateLimitedError,
@@ -12,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   authorize: vi.fn(),
   update: vi.fn(),
   setResponseStatus: vi.fn(),
+  clientIp: '203.0.113.1' as string | undefined,
 }))
 
 vi.mock('h3', async (importOriginal) => {
@@ -20,7 +27,7 @@ vi.mock('h3', async (importOriginal) => {
     ...original,
     defineEventHandler: (handler: unknown) => handler,
     getRequestHeader: (_event: unknown, name: string) => name === 'cf-connecting-ip'
-      ? '203.0.113.1'
+      ? mocks.clientIp
       : 'secret12',
     getRequestURL: () => new URL('https://urlow.example/api/short-urls/Abcd1234'),
     getRouterParam: () => 'Abcd1234',
@@ -55,7 +62,7 @@ function record() {
   }
 }
 
-function event(): H3Event {
+function event(localDevMarker?: unknown): H3Event {
   return {
     context: {
       cloudflare: {
@@ -67,6 +74,7 @@ function event(): H3Event {
             delete: vi.fn(),
           },
           MANAGEMENT_RATE_LIMITER: { limit: vi.fn() },
+          ...(localDevMarker === undefined ? {} : { URLOW_LOCAL_DEV: localDevMarker }),
         },
       },
     },
@@ -77,6 +85,7 @@ describe('short URL management API', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.body = { note: ' revised ' }
+    mocks.clientIp = '203.0.113.1'
     mocks.authorize.mockResolvedValue(record())
     mocks.update.mockResolvedValue({
       row: { ...record(), note: 'revised' },
@@ -95,7 +104,19 @@ describe('short URL management API', () => {
         hasManagementPassword: true,
       },
     })
+    expect(managementResponseSchema.safeParse(response).success).toBe(true)
     expect(JSON.stringify(response)).not.toContain('never-public')
+  })
+
+  it('passes local-dev identity only for the exact local marker when IP is absent', async () => {
+    mocks.clientIp = undefined
+
+    await getHandler(event('true'))
+    expect(mocks.authorize).toHaveBeenCalledWith('Abcd1234', 'secret12', 'local-dev')
+
+    mocks.authorize.mockClear()
+    await getHandler(event('TRUE'))
+    expect(mocks.authorize).toHaveBeenCalledWith('Abcd1234', 'secret12', undefined)
   })
 
   it.each([
@@ -109,6 +130,7 @@ describe('short URL management API', () => {
     const response = await getHandler(requestEvent)
     expect(mocks.setResponseStatus).toHaveBeenCalledWith(requestEvent, status)
     expect(response).toMatchObject({ error: { code } })
+    expect(managementErrorResponseSchema.safeParse(response).success).toBe(true)
   })
 
   it('returns normalized PATCH metadata and cache synchronization state', async () => {
@@ -126,6 +148,7 @@ describe('short URL management API', () => {
         staleWindowWarning: expect.any(String),
       },
     })
+    expect(updateShortUrlResponseSchema.safeParse(response).success).toBe(true)
   })
 
   it('rejects an empty PATCH before authorization', async () => {
@@ -134,6 +157,7 @@ describe('short URL management API', () => {
     const response = await patchHandler(requestEvent)
     expect(mocks.setResponseStatus).toHaveBeenCalledWith(requestEvent, 400)
     expect(response).toMatchObject({ error: { code: 'VALIDATION_ERROR' } })
+    expect(validationErrorResponseSchema.safeParse(response).success).toBe(true)
     expect(mocks.update).not.toHaveBeenCalled()
   })
 })
