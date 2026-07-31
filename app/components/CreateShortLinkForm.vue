@@ -125,7 +125,17 @@ onBeforeUnmount(() => {
     @submit.prevent="createShortLink"
   >
     <div class="field">
-      <label for="create-original-url">長網址</label>
+      <div class="label-row">
+        <label for="create-original-url">長網址</label>
+        <span
+          v-if="originalUrlError"
+          id="create-original-url-error"
+          class="error-message"
+          aria-live="polite"
+        >
+          {{ originalUrlError }}
+        </span>
+      </div>
       <div class="input-shell">
         <span class="field-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none">
@@ -142,17 +152,23 @@ onBeforeUnmount(() => {
           placeholder="https://example.com/your-long-link"
           :disabled="isCreating"
           :aria-invalid="originalUrlError ? 'true' : undefined"
-          aria-describedby="create-original-url-error"
+          :aria-describedby="originalUrlError ? 'create-original-url-error' : undefined"
           @input="originalUrlError = ''"
         >
       </div>
-      <p id="create-original-url-error" class="form-message error-message" aria-live="polite">
-        {{ originalUrlError }}
-      </p>
     </div>
 
     <div class="field">
-      <label for="create-password">管理密碼</label>
+      <div class="label-row">
+        <label for="create-password">管理密碼</label>
+        <span
+          id="create-password-feedback"
+          :class="{ 'error-message': passwordError }"
+          aria-live="polite"
+        >
+          {{ passwordError || '（選填，如未設定建立後將無法修改）' }}
+        </span>
+      </div>
       <div class="input-shell">
         <span class="field-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none">
@@ -165,10 +181,10 @@ onBeforeUnmount(() => {
           v-model="password"
           :type="showPassword ? 'text' : 'password'"
           autocomplete="new-password"
-          placeholder="設定管理密碼（選填）"
+          placeholder="設定管理密碼"
           :disabled="isCreating"
           :aria-invalid="passwordError ? 'true' : undefined"
-          aria-describedby="create-password-hint create-password-error"
+          :aria-describedby="passwordError ? 'create-password-feedback' : undefined"
           @input="passwordError = ''"
         >
         <button
@@ -185,22 +201,20 @@ onBeforeUnmount(() => {
           </svg>
         </button>
       </div>
-      <p
-        id="create-password-hint"
-        class="form-message"
-        :class="{ 'error-message': !password.trim() }"
-      >
-        未設定管理密碼，建立後將無法修改此短網址
-      </p>
-      <p id="create-password-error" class="form-message error-message" aria-live="polite">
-        {{ passwordError }}
-      </p>
     </div>
 
     <div class="field">
       <div class="label-row">
         <label for="create-note">備註說明</label>
-        <span>選填</span>
+        <div class="label-row-feedback" aria-live="polite">
+          <span v-if="noteError" id="create-note-error" class="error-message">
+            {{ noteError }}
+          </span>
+          <span v-if="formError" id="create-form-error" class="error-message">
+            {{ formError }}
+          </span>
+          <span v-if="!noteError && !formError">選填</span>
+        </div>
       </div>
       <textarea
         id="create-note"
@@ -210,21 +224,14 @@ onBeforeUnmount(() => {
         placeholder="記下這個連結的用途或內容"
         :disabled="isCreating"
         :aria-invalid="noteError ? 'true' : undefined"
-        aria-describedby="create-note-error"
+        :aria-describedby="noteError ? 'create-note-error' : undefined"
         @input="noteError = ''"
       />
-      <p id="create-note-error" class="form-message error-message" aria-live="polite">
-        {{ noteError }}
-      </p>
     </div>
 
-    <p class="form-message error-message" aria-live="polite">
-      {{ formError }}
-    </p>
-
-    <div class="grid grid-cols-[auto_minmax(0,1fr)] items-stretch gap-3 max-[700px]:grid-cols-1">
+    <div class="grid grid-cols-[auto_minmax(0,1fr)] items-stretch gap-2.5 max-[700px]:grid-cols-1">
       <button
-        class="primary-button create-submit w-[184px] px-[18px] max-[700px]:w-full"
+        class="primary-button create-submit w-[168px] px-[15px] max-[700px]:w-full"
         type="submit"
         :disabled="isCreating"
       >

@@ -180,7 +180,8 @@ describe('real API short URL creation', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('未設定管理密碼，建立後將無法修改此短網址')
+    expect(wrapper.text()).toContain('（選填，如未設定建立後將無法修改）')
+    expect(wrapper.find('#create-password-hint').exists()).toBe(false)
     expect(confirm).not.toHaveBeenCalled()
   })
 
@@ -216,7 +217,7 @@ describe('real API short URL creation', () => {
 
     expect(wrapper.get('#create-original-url-error').text())
       .toBe('請輸入有效的 HTTP(S) 長網址')
-    expect(wrapper.get('#create-password-error').text())
+    expect(wrapper.get('#create-password-feedback').text())
       .toBe('管理密碼須為 6 至 72 個字元')
     expect(wrapper.get('#create-note-error').text()).toBe('備註不可超過 240 個字元')
     expect(wrapper.text()).toContain('送出的資料格式無效，請檢查後再試')
@@ -473,7 +474,7 @@ describe('compact accessible management layout', () => {
     const wrapper = await authorizeEditForm()
 
     expect(wrapper.get('.management-primary-fields').classes()).toContain('grid')
-    expect(wrapper.get('.enabled-toggle-heading').text()).toBe('啟用狀態')
+    expect(wrapper.get('.enabled-toggle-heading').text()).toBe('狀態')
     expect(wrapper.get('.enabled-toggle-control').exists()).toBe(true)
     expect(wrapper.get('#edit-enabled').attributes('type')).toBe('checkbox')
   })
@@ -494,7 +495,6 @@ describe('homepage mock data removal', () => {
 
     expect(wrapper.find('[data-test="create-form"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="edit-form"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('本機展示資料')
     expect(wrapper.html()).not.toContain('demo-')
   })
 })

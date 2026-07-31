@@ -202,9 +202,19 @@ function resetLookup() {
     role="tabpanel"
     aria-labelledby="edit-tab"
   >
-    <form class="lookup-form grid grid-cols-[minmax(0,1fr)_minmax(0,.82fr)_auto] items-end gap-3 max-[700px]:grid-cols-1" @submit.prevent="lookupShortLink">
+    <form class="lookup-form grid grid-cols-[minmax(0,1fr)_minmax(0,.82fr)_auto] items-end gap-2.5 max-[700px]:grid-cols-1" @submit.prevent="lookupShortLink">
       <div class="field">
-        <label for="lookup-short-url">短網址或短碼</label>
+        <div class="label-row">
+          <label for="lookup-short-url">短網址或短碼</label>
+          <div class="label-row-feedback" aria-live="polite">
+            <span v-if="lookupShortUrlError" id="lookup-short-url-error" class="error-message">
+              {{ lookupShortUrlError }}
+            </span>
+            <span v-if="lookupError" id="lookup-form-error" class="error-message">
+              {{ lookupError }}
+            </span>
+          </div>
+        </div>
         <div class="input-shell input-shell--mono">
           <input
             id="lookup-short-url"
@@ -215,13 +225,10 @@ function resetLookup() {
             placeholder="https://urlow.io/aB3xY8qP"
             :disabled="isLookingUp"
             :aria-invalid="lookupShortUrlError ? 'true' : undefined"
-            aria-describedby="lookup-short-url-error"
+            :aria-describedby="lookupShortUrlError ? 'lookup-short-url-error' : lookupError ? 'lookup-form-error' : undefined"
             @input="resetLookup"
           >
         </div>
-        <p id="lookup-short-url-error" class="form-message error-message" aria-live="polite">
-          {{ lookupShortUrlError }}
-        </p>
       </div>
 
       <div class="field">
@@ -253,7 +260,7 @@ function resetLookup() {
       </div>
 
       <button
-        class="primary-button lookup-submit w-auto min-w-[126px] px-[17px] max-[700px]:w-full"
+        class="primary-button lookup-submit w-auto min-w-[116px] px-[14px] max-[700px]:w-full"
         type="submit"
         :disabled="isLookingUp"
       >
@@ -261,18 +268,24 @@ function resetLookup() {
       </button>
     </form>
 
-    <p class="form-message error-message" aria-live="polite">
-      {{ lookupError }}
-    </p>
-
     <form
       v-if="selectedCode"
-      class="management-edit-form mt-5 border-t border-[rgba(102,112,133,.13)] pt-6"
+      class="management-edit-form mt-4 border-t border-[rgba(102,112,133,.13)] pt-5"
       @submit.prevent="updateShortLinkSettings"
     >
-      <div class="management-primary-fields mb-[22px] grid grid-cols-[minmax(0,1fr)_auto] gap-[14px] max-[700px]:grid-cols-1">
+      <div class="management-primary-fields mb-[17px] grid grid-cols-[minmax(0,1fr)_auto] gap-3 max-[700px]:grid-cols-1">
         <div class="field mb-0 min-w-0">
-          <label for="edit-original-url">長網址</label>
+          <div class="label-row">
+            <label for="edit-original-url">長網址</label>
+            <span
+              v-if="originalUrlError"
+              id="edit-original-url-error"
+              class="error-message"
+              aria-live="polite"
+            >
+              {{ originalUrlError }}
+            </span>
+          </div>
           <div class="input-shell">
             <input
               id="edit-original-url"
@@ -280,13 +293,10 @@ function resetLookup() {
               type="url"
               :disabled="isUpdating"
               :aria-invalid="originalUrlError ? 'true' : undefined"
-              aria-describedby="edit-original-url-error"
+              :aria-describedby="originalUrlError ? 'edit-original-url-error' : undefined"
               @input="originalUrlError = ''"
             >
           </div>
-          <p id="edit-original-url-error" class="form-message error-message" aria-live="polite">
-            {{ originalUrlError }}
-          </p>
         </div>
         <EnabledToggle v-model="enabled" :disabled="isUpdating" />
       </div>
@@ -311,7 +321,7 @@ function resetLookup() {
         </p>
       </div>
 
-      <button class="primary-button" type="submit" :disabled="isUpdating">
+      <button class="primary-button management-save-button" type="submit" :disabled="isUpdating">
         {{ isUpdating ? '儲存中…' : '儲存修改' }}
       </button>
       <p class="form-message error-message" aria-live="polite">
